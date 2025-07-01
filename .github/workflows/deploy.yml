@@ -10,19 +10,19 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      BACK_ENV: ${{ secrets.BACK_ENV }}  # .env как секрет (без многострочных переменных!)
+      BACK_ENV: ${{ secrets.BACK_ENV }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.8.1
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.7.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}  # твой приватный ключ
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.AZURE_VM_SSH_PASSPHRASE }}
 
-      - name: Add remote server to known_hosts
+      - name: Add server to known_hosts
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.AZURE_VM_IP }} >> ~/.ssh/known_hosts
@@ -30,8 +30,7 @@ jobs:
       - name: Deploy to Azure VM
         run: |
           ssh ${{ secrets.AZURE_VM_USER }}@${{ secrets.AZURE_VM_IP }} << 'EOF'
-            set -e  # выйти при ошибке
-
+            set -e
             cd ~/batyr-ai-back || exit 1
 
             echo "$BACK_ENV" > ./backend/.env
