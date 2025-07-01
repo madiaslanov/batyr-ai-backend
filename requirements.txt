@@ -1,6 +1,8 @@
 fastapi
-uvicorn
+uvicorn[standard]
 openai>=1.0.0
 python-dotenv
 yandex-speechkit
 requests
+httpx
+python-multipart
