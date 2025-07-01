@@ -10,25 +10,25 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      BACK_ENV: ${{ secrets.BACK_ENV }}
+      BACK_ENV: ${{ secrets.BACK_ENV }}  # .env в виде одной переменной (однострочной)
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.9.0  # ✅ последняя стабильная версия
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}  # приватный ключ в secrets
 
       - name: Add Azure VM to known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ vars.AZURE_VM_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.AZURE_VM_IP }} >> ~/.ssh/known_hosts
 
       - name: Deploy to Azure VM
         run: |
-          ssh ${{ vars.AZURE_VM_USER }}@${{ vars.AZURE_VM_IP }} << 'EOF'
+          ssh ${{ secrets.AZURE_VM_USER }}@${{ secrets.AZURE_VM_IP }} << 'EOF'
             cd ~/batyr-ai-back
             git pull origin main
 
