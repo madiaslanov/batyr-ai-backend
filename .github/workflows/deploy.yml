@@ -28,7 +28,7 @@ jobs:
       - name: Deploy to Azure VM
         run: |
           ssh ${{ secrets.AZURE_VM_USER }}@${{ secrets.AZURE_VM_IP }} << 'EOF'
-            cd ~/batyr-ai-back || exit 1
+            cd ~/batyr-ai-backend || exit 1
             git pull origin main
 
             echo "$BACK_ENV" > ./backend/.env
