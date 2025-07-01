@@ -1,4 +1,4 @@
-name: Deploy Django App via Docker Compose
+name: BatyrAi Deploy
 
 on:
   push:
@@ -7,19 +7,39 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     env:
-      BACK_ENV: ${{ vars.BACK_ENV }}
+      BACK_ENV: ${{ secrets.BACK_ENV }}  # .env как секрет (без многострочных переменных!)
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Build and run with Docker Compose
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}  # твой приватный ключ
+          passphrase: ${{ secrets.AZURE_VM_SSH_PASSPHRASE }}
+
+      - name: Add remote server to known_hosts
         run: |
-          echo "$BACK_ENV" > ./backend/.env
-          echo "📦 BACK_ENV:"
-          cat ./backend/.env  
-          docker compose down
-          docker compose up -d --build
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.AZURE_VM_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Azure VM
+        run: |
+          ssh ${{ secrets.AZURE_VM_USER }}@${{ secrets.AZURE_VM_IP }} << 'EOF'
+            set -e  # выйти при ошибке
+
+            cd ~/batyr-ai-back || exit 1
+
+            echo "$BACK_ENV" > ./backend/.env
+            echo "📦 BACK_ENV content:"
+            cat ./backend/.env
+
+            git pull origin main
+
+            docker compose down
+            docker compose up -d --build
+          EOF
