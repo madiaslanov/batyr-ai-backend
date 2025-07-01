@@ -5,3 +5,5 @@ python-dotenv
 requests
 httpx
 python-multipart
+aiofiles                
+pillow                  
