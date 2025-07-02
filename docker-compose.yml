@@ -1,11 +1,34 @@
-version: "3.8"
+# docker-compose.yml
+
+version: '3.8'
 
 services:
-  backend:
+  batyr-backend:
     build: .
     container_name: batyr-backend
     ports:
-      - "8000:80" 
-    restart: always
+      - "8000:8000"
+    volumes:
+      - ./batyr-images:/batyr-images
     env_file:
-      - ./.env
+      - .env
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+    networks:
+      - batyr-net
+
+  redis:
+    image: "redis:alpine"
+    container_name: redis
+    # (Опционально) Если хотите подключаться к Redis с вашего компьютера для отладки
+    # ports:
+    #   - "6379:6379"
+    networks:
+      - batyr-net
+
+networks:
+  batyr-net:
+    driver: bridge
