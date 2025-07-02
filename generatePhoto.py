@@ -91,10 +91,18 @@ def on_startup():
         raise RuntimeError("Не удалось установить соединение с Redis. Приложение не может запуститься.")
 
 # --- Middleware для CORS ---
+origins = [
+    "https://batyrai.com",     # Ваш основной домен
+    "http://localhost",         # Оставим на всякий случай для тестов
+    "http://localhost:3000",    # И этот тоже
+    "http://localhost:8000",
+    "http://localhost:80",
+    "https://batyr-ai.vercel.app"
+]
 # (Ваш код middleware остается без изменений)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,      # <<< Используем наш новый список
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
