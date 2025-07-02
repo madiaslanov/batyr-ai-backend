@@ -8,4 +8,4 @@ services:
       - "8000:80" 
     restart: always
     env_file:
-      - ./backend/.env
+      - ./.env
