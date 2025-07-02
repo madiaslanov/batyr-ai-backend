@@ -7,9 +7,10 @@ services:
     build: .
     container_name: batyr-backend
     ports:
-      - "8000:8000"
+      - "80:8000"
     volumes:
       - ./batyr-images:/batyr-images
+      - ./storage:/storage
     env_file:
       - .env
     environment:
