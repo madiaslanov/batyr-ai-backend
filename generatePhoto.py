@@ -92,12 +92,8 @@ def on_startup():
 
 # --- Middleware для CORS ---
 origins = [
-    "https://batyrai.com",     # Ваш основной домен
-    "http://localhost",         # Оставим на всякий случай для тестов
-    "http://localhost:3000",    # И этот тоже
-    "http://localhost:8000",
-    "http://localhost:80",
-    "https://batyr-ai.vercel.app"
+    "https://batyrai.com",
+    "http://localhost:3000",
 ]
 # (Ваш код middleware остается без изменений)
 app.add_middleware(
