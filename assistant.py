@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import azure.cognitiveservices.speech as speechsdk
 from openai import AzureOpenAI
 from typing import List
-from pydub import AudioSegment  # <-- ИМПОРТ ДЛЯ КОНВЕРТАЦИИ
+from pydub import AudioSegment  # <-- Импорт для конвертации
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -39,11 +39,10 @@ app = FastAPI(
     description="Отдельный сервис для голосового AI-ассистента."
 )
 
-# Настраиваем CORS
-origins = ["*"] # Упрощаем для надежности
+# Настраиваем CORS, разрешая все источники для максимальной совместимости
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,15 +50,13 @@ app.add_middleware(
 
 # --- Вспомогательные функции ---
 
-# ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ РАСПОЗНАВАНИЯ С КОНВЕРТАЦИЕЙ АУДИО
+# ✅ ФИНАЛЬНАЯ, РАБОЧАЯ ФУНКЦИЯ РАСПОЗНАВАНИЯ РЕЧИ
 def recognize_speech_from_bytes(audio_bytes: bytes) -> str:
     try:
         # 1. Загружаем аудио из байтов с помощью pydub (автоопределение формата)
         audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
-
         # 2. Конвертируем в нужный формат для Azure: WAV, 16kHz, моно
         audio_segment = audio_segment.set_channels(1).set_frame_rate(16000)
-
         # 3. Экспортируем результат в виде байтов WAV в память
         wav_buffer = io.BytesIO()
         audio_segment.export(wav_buffer, format="wav")
@@ -69,19 +66,22 @@ def recognize_speech_from_bytes(audio_bytes: bytes) -> str:
         print(f"🔥 Ошибка конвертации аудио с помощью pydub: {e}")
         raise ValueError("Не удалось обработать аудиофайл.")
 
-    # 4. Работаем с Azure SDK, передавая ему чистые WAV-байты
+    # 4. Работаем с Azure SDK, используя правильный Push-поток
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION, speech_recognition_language="kk-KZ")
     
-    stream = speechsdk.audio.PullAudioInputStream(wav_bytes)
+    stream = speechsdk.audio.PushAudioInputStream()
     audio_config = speechsdk.audio.AudioConfig(stream=stream)
     
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     
+    # "Скармливаем" наши сконвертированные WAV-байты в поток
+    stream.write(wav_bytes)
+    stream.close() 
+
     result = recognizer.recognize_once_async().get()
 
     if result.reason == speechsdk.ResultReason.RecognizedSpeech:
         print(f"Распознано: '{result.text}'")
-        # Исправляем пустые результаты, которые Azure иногда возвращает
         if not result.text or result.text.isspace():
              raise ValueError("Распознан пустой текст.")
         return result.text
@@ -92,6 +92,7 @@ def recognize_speech_from_bytes(audio_bytes: bytes) -> str:
         if cancellation_details.reason == speechsdk.CancellationReason.Error:
             print(f"Код ошибки: {cancellation_details.error_details}")
         raise RuntimeError(f"Ошибка распознавания: {cancellation_details.reason}")
+    
     raise RuntimeError(f"Неизвестный результат распознавания: {result.reason}")
 
 
@@ -122,7 +123,7 @@ def synthesize_speech_from_text(text: str) -> bytes:
     raise RuntimeError(f"Ошибка синтеза речи: {result.cancellation_details.reason}")
 
 
-# --- ФИНАЛЬНЫЙ, ИСПРАВЛЕННЫЙ ЭНДПОИНТ ---
+# --- ФИНАЛЬНЫЙ, РАБОЧИЙ ЭНДПОИНТ ---
 @app.post("/api/ask-assistant")
 async def ask_assistant(
     audio_file: UploadFile = File(...),
@@ -147,7 +148,6 @@ async def ask_assistant(
         })
 
     except ValueError as e:
-        # Возвращаем ошибки распознавания и конвертации как 400 Bad Request
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         traceback.print_exc()
