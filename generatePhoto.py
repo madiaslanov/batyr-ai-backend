@@ -10,12 +10,10 @@ import time
 from datetime import datetime
 from typing import List, Dict, Optional
 
-# Импорты для уменьшения изображений
 from PIL import Image
 import io
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, status, BackgroundTasks, Header
-# Импорт для потоковой передачи файла
 from fastapi.responses import StreamingResponse 
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -129,15 +127,20 @@ def resize_image_to_base64(image_bytes: bytes, max_size: int = 1024) -> str:
         print(f"🔥 Ошибка при уменьшении изображения: {e}")
         raise ValueError("Не удалось обработать изображение.") from e
 
+# ✅ ИЗМЕНЕННАЯ ФОНОВАЯ ЗАДАЧА С УЛУЧШЕННЫМИ СТАТУСАМИ
 def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes):
     try:
-        update_job_status(job_id, {"status": "processing", "message": "Уменьшение изображения..."})
+        # СТАТУС 1: Начало обработки и уменьшение
+        update_job_status(job_id, {"status": "processing", "message": "⏳ Уменьшаю ваше фото и подбираю образ..."})
+        
         user_photo_data_uri = resize_image_to_base64(user_photo_bytes)
         target_image_uri = get_random_batyr_image_uri()
+        
         headers = {"x-api-key": PIAPI_KEY, "Content-Type": "application/json"}
         payload = { "model": "Qubico/image-toolkit", "task_type": "face-swap", "input": {"target_image": target_image_uri, "swap_image": user_photo_data_uri} }
         
-        update_job_status(job_id, {"status": "sending", "message": "Отправка запроса в PiAPI"})
+        # СТАТУС 2: Отправка в нейросеть
+        update_job_status(job_id, {"status": "sending", "message": "🛰️ Отправляю данные в нейросеть..."})
         with httpx.Client(timeout=30.0) as client:
             response = client.post("https://api.piapi.ai/api/v1/task", headers=headers, json=payload)
             response.raise_for_status()
@@ -152,22 +155,35 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes):
             time.sleep(POLLING_INTERVAL)
             with httpx.Client(timeout=15.0) as client:
                 res = client.get(f"https://api.piapi.ai/api/v1/task/{piapi_task_id}", headers=headers)
+            
             if res.status_code == 200:
                 piapi_data = res.json().get("data", {})
                 piapi_status = piapi_data.get("status", "Unknown").title()
+
                 if piapi_status == "Completed":
                     result_url = piapi_data.get("output", {}).get("image_url")
-                    update_job_status(job_id, {"status": "completed", "result_url": result_url})
+                    update_job_status(job_id, {"status": "completed", "result_url": result_url, "message": "✅ Изображение готово"})
                     return
                 elif piapi_status == "Failed":
                     error_details = piapi_data.get("error", "Неизвестная ошибка PiAPI")
                     update_job_status(job_id, {"status": "failed", "error": f"PiAPI ошибка: {error_details}"})
                     return
+                # СТАТУС 3: Нейросеть работает
+                elif piapi_status in ["Processing", "Pending", "Staged"]:
+                    update_job_status(job_id, {
+                        "status": "processing", 
+                        "message": f"👨‍🎨 Нейросеть рисует... (статус: {piapi_status})"
+                    })
+                else:
+                    update_job_status(job_id, {"status": "failed", "error": f"Неизвестный статус PiAPI: {piapi_status}"})
+                    return
+        
         update_job_status(job_id, {"status": "timeout", "error": f"Превышено время ожидания ({MAX_POLLING_TIME}с)"})
     except Exception as e:
         error_msg = f"Критическая ошибка в фоновой задаче: {str(e)}"
         traceback.print_exc()
         update_job_status(job_id, {"status": "failed", "error": error_msg})
+
 
 # --- Главные эндпоинты ---
 @app.post("/api/start-face-swap", status_code=status.HTTP_202_ACCEPTED)
@@ -187,7 +203,7 @@ async def start_face_swap_task(
         if not user_photo.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="Недопустимый тип файла.")
         user_photo_bytes = await user_photo.read()
-        initial_status = {"status": "accepted", "job_id": job_id}
+        initial_status = {"status": "accepted", "job_id": job_id, "message": "⏳ Генерация изображения..."}
         update_job_status(job_id, initial_status)
         background_tasks.add_task(run_face_swap_in_background, job_id, user_photo_bytes)
         print(f"👍 [Job: {job_id}] Задача принята для пользователя {x_telegram_user_id}.")
@@ -205,7 +221,6 @@ async def get_task_status(job_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Ошибка сервера.")
 
-# ✅ ПРАВИЛЬНОЕ МЕСТО ДЛЯ ЭНДПОИНТА СКАЧИВАНИЯ
 @app.get("/api/download-image")
 async def download_image_proxy(url: str):
     if not url:
