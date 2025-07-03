@@ -1,12 +1,15 @@
 # database.py
 import sqlite3
 import datetime
+import os # ✅ Добавляем импорт os
 from pathlib import Path
 from typing import Tuple
 
 # --- Константы и инициализация ---
 DB_FILE = Path("storage/users.db")
 DAILY_LIMIT = 1 
+# ✅ Получаем ID админа из переменных окружения
+ADMIN_ID = int(os.getenv("ADMIN_TELEGRAM_ID", "0"))
 
 def init_db():
     """Инициализирует базу данных и создает таблицу, если она не существует."""
@@ -27,11 +30,13 @@ def init_db():
         conn.commit()
         conn.close()
         print(f"✅ База данных инициализирована: {DB_FILE}")
+        if ADMIN_ID != 0:
+            print(f"👑 Пользователь с ID {ADMIN_ID} является админом.")
     except Exception as e:
         print(f"🔥 Критическая ошибка при инициализации БД: {e}")
         raise
 
-# --- ✅ НОВАЯ, БЕЗОПАСНАЯ ЛОГИКА ---
+# --- Безопасная логика работы с пользователями ---
 
 def get_or_create_user(user_id: int, username: str, first_name: str) -> None:
     """
@@ -44,19 +49,16 @@ def get_or_create_user(user_id: int, username: str, first_name: str) -> None:
         cursor = conn.cursor()
         today_str = datetime.date.today().isoformat()
 
-        # Проверяем наличие пользователя
         cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
         user_exists = cursor.fetchone()
 
         if not user_exists:
-            # Если пользователя нет, создаем его
             cursor.execute(
                 "INSERT INTO users (user_id, username, first_name, usage_count, last_usage_date, first_seen_date) VALUES (?, ?, ?, ?, ?, ?)",
                 (user_id, username, first_name, 0, '1970-01-01', today_str)
             )
             conn.commit()
             print(f"✅ Новый пользователь {user_id} ({first_name}) зарегистрирован в системе.")
-        # Если пользователь уже существует, ничего не делаем
 
     except Exception as e:
         print(f"🔥 Ошибка в get_or_create_user для user_id {user_id}: {e}")
@@ -68,8 +70,12 @@ def get_or_create_user(user_id: int, username: str, first_name: str) -> None:
 def can_user_generate(user_id: int) -> Tuple[bool, str, int]:
     """
     Проверяет, может ли пользователь генерировать, и списывает попытку.
-    Эта функция БОЛЬШЕ НЕ СОЗДАЕТ пользователя.
+    Админы имеют бесконечные попытки.
     """
+    # ✅ Проверка на админа в самом начале
+    if user_id == ADMIN_ID:
+        return True, "👑 Админу можно всё!", 999 # Возвращаем условное большое число попыток
+
     conn = None
     try:
         conn = sqlite3.connect(DB_FILE)
@@ -80,18 +86,15 @@ def can_user_generate(user_id: int) -> Tuple[bool, str, int]:
         cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
         user_data = cursor.fetchone()
 
-        # Если по какой-то причине пользователя нет в БД, запрещаем генерацию
         if user_data is None:
             return False, "Пользователь не найден. Пожалуйста, перезапустите приложение.", 0
 
         last_date_str = user_data['last_usage_date']
         current_usage = user_data['usage_count']
 
-        # Если последняя генерация была не сегодня, сбрасываем счетчик
         if last_date_str != today_str:
             current_usage = 0
         
-        # Проверяем лимит
         if current_usage < DAILY_LIMIT:
             new_count = current_usage + 1
             cursor.execute(
@@ -110,8 +113,6 @@ def can_user_generate(user_id: int) -> Tuple[bool, str, int]:
     finally:
         if conn:
             conn.close()
-
-# --- Остальные функции ---
 
 def get_total_users_count() -> int:
     """Подсчитывает общее количество пользователей в базе."""
