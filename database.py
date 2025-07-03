@@ -2,11 +2,14 @@
 import sqlite3
 import datetime
 from pathlib import Path
+from typing import Tuple
 
+# --- Константы и инициализация ---
 DB_FILE = Path("storage/users.db")
 DAILY_LIMIT = 1 
 
 def init_db():
+    """Инициализирует базу данных и создает таблицу, если она не существует."""
     try:
         DB_FILE.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(DB_FILE)
@@ -28,30 +31,67 @@ def init_db():
         print(f"🔥 Критическая ошибка при инициализации БД: {e}")
         raise
 
-async def can_user_generate(user_id: int, username: str, first_name: str) -> (bool, str, int):
+# --- ✅ НОВАЯ, БЕЗОПАСНАЯ ЛОГИКА ---
+
+def get_or_create_user(user_id: int, username: str, first_name: str) -> None:
+    """
+    Проверяет, существует ли пользователь. Если нет - создает его.
+    Вызывается только с проверенными данными из initData.
+    """
+    conn = None
     try:
         conn = sqlite3.connect(DB_FILE)
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         today_str = datetime.date.today().isoformat()
-        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-        user_data = cursor.fetchone()
 
-        if user_data is None:
+        # Проверяем наличие пользователя
+        cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
+        user_exists = cursor.fetchone()
+
+        if not user_exists:
+            # Если пользователя нет, создаем его
             cursor.execute(
                 "INSERT INTO users (user_id, username, first_name, usage_count, last_usage_date, first_seen_date) VALUES (?, ?, ?, ?, ?, ?)",
                 (user_id, username, first_name, 0, '1970-01-01', today_str)
             )
             conn.commit()
-            cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-            user_data = cursor.fetchone()
-        
+            print(f"✅ Новый пользователь {user_id} ({first_name}) зарегистрирован в системе.")
+        # Если пользователь уже существует, ничего не делаем
+
+    except Exception as e:
+        print(f"🔥 Ошибка в get_or_create_user для user_id {user_id}: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+
+def can_user_generate(user_id: int) -> Tuple[bool, str, int]:
+    """
+    Проверяет, может ли пользователь генерировать, и списывает попытку.
+    Эта функция БОЛЬШЕ НЕ СОЗДАЕТ пользователя.
+    """
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        today_str = datetime.date.today().isoformat()
+
+        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+        user_data = cursor.fetchone()
+
+        # Если по какой-то причине пользователя нет в БД, запрещаем генерацию
+        if user_data is None:
+            return False, "Пользователь не найден. Пожалуйста, перезапустите приложение.", 0
+
         last_date_str = user_data['last_usage_date']
         current_usage = user_data['usage_count']
 
+        # Если последняя генерация была не сегодня, сбрасываем счетчик
         if last_date_str != today_str:
             current_usage = 0
         
+        # Проверяем лимит
         if current_usage < DAILY_LIMIT:
             new_count = current_usage + 1
             cursor.execute(
@@ -68,10 +108,14 @@ async def can_user_generate(user_id: int, username: str, first_name: str) -> (bo
         print(f"🔥 Ошибка в can_user_generate для user_id {user_id}: {e}")
         return False, "Произошла ошибка при проверке лимита.", 0
     finally:
-        if 'conn' in locals() and conn:
+        if conn:
             conn.close()
 
-async def get_total_users_count() -> int:
+# --- Остальные функции ---
+
+def get_total_users_count() -> int:
+    """Подсчитывает общее количество пользователей в базе."""
+    conn = None
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -82,5 +126,5 @@ async def get_total_users_count() -> int:
         print(f"🔥 Ошибка при подсчете пользователей: {e}")
         return 0
     finally:
-        if 'conn' in locals() and conn:
+        if conn:
             conn.close()
