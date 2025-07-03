@@ -3,14 +3,17 @@
 version: '3.8'
 
 services:
+  # --- Ваш старый сервис для бэкенда ---
   batyr-backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile # Явно указываем, какой Dockerfile использовать
     container_name: batyr-backend
     ports:
       - "8000:8000"
     volumes:
-      - ./batyr-images:/batyr-images
-      - ./storage:/app/storage  
+      - ./batyr-images:/app/batyr-images
+      - ./storage:/app/storage
     env_file:
       - .env
     environment:
@@ -20,18 +23,28 @@ services:
       - redis
     networks:
       - batyr-net
+    restart: always # ✅ Рекомендуется добавить, чтобы сервис перезапускался при сбоях
 
+  # --- ✅ НАШ НОВЫЙ СЕРВИС ДЛЯ БОТА ---
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: bot.Dockerfile # Указываем Dockerfile для бота
+    container_name: telegram-bot
+    env_file:
+      - .env # Используем тот же .env файл
+    networks:
+      - batyr-net
+    restart: always # Также добавляем авторестарт
+
+  # --- Ваш старый сервис Redis ---
   redis:
     image: "redis:alpine"
     container_name: redis
-    # (Опционально) Если хотите подключаться к Redis с вашего компьютера для отладки
-    # ports:
-    #   - "6379:6379"
     networks:
       - batyr-net
+    restart: always
 
 networks:
   batyr-net:
     driver: bridge
-
-    
