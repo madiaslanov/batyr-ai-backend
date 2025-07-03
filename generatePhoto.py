@@ -194,14 +194,31 @@ async def start_face_swap_task(
     x_telegram_username: Optional[str] = Header(None, description="Username пользователя Telegram"),
     x_telegram_first_name: Optional[str] = Header(None, description="Имя пользователя Telegram")
 ):
-    can_generate, message, remaining_attempts = await can_user_generate(
-        user_id=x_telegram_user_id,
-        username=x_telegram_username or "N/A",
-        first_name=x_telegram_first_name or "N/A"
-    )
-    if not can_generate:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=message)
+    """
+    Принимает фото, проверяет лимит пользователя и запускает обработку в фоне.
+    """
+    
+    # --- НАЧАЛО БЛОКА ОТКЛЮЧЕНИЯ ЛИМИТА ---
+    # ✅ ВРЕМЕННО ОТКЛЮЧЕНО: Мы комментируем вызов функции проверки лимита
+    # can_generate, message, remaining_attempts = await can_user_generate(
+    #     user_id=x_telegram_user_id,
+    #     username=x_telegram_username or "N/A",
+    #     first_name=x_telegram_first_name or "N/A"
+    # )
+    #
+    # ✅ ВРЕМЕННО ОТКЛЮЧЕНО: И проверку, которая блокирует пользователя
+    # if not can_generate:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+    #         detail=message
+    #     )
+        
+    # ✅ ДОБАВЛЕНО: Просто устанавливаем "бесконечное" количество попыток для теста
+    remaining_attempts = 999 
+    # --- КОНЕЦ БЛОКА ОТКЛЮЧЕНИЯ ЛИМИТА ---
 
+
+    # 2. Если лимит в порядке, продолжаем старую логику
     job_id = str(uuid.uuid4())
     try:
         if not user_photo.content_type.startswith("image/"):
@@ -220,8 +237,9 @@ async def start_face_swap_task(
             "job_id": job_id,
             "status": "accepted",
             "message": "Задача принята в обработку.",
-            "remaining_attempts": remaining_attempts
+            "remaining_attempts": remaining_attempts # Используем нашу "фальшивую" переменную
         }
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при запуске задачи: {str(e)}")
 
