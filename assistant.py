@@ -4,6 +4,7 @@ import io
 import json
 import base64
 import logging
+import datetime  # Добавлен импорт для временных меток
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,7 +15,6 @@ from pydub import AudioSegment
 from pydantic import BaseModel, Field
 
 # --- 1. Настройка логирования ---
-# Логирование - это стандарт для продакшена. Оно гибче, чем print().
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -23,19 +23,16 @@ logging.basicConfig(
 # --- 2. Загрузка переменных и константы ---
 load_dotenv()
 
-# Конфигурация Azure Speech
 SPEECH_KEY = os.getenv("SPEECH_KEY")
 SPEECH_REGION = os.getenv("SPEECH_REGION")
-SPEECH_VOICE_NAME = "kk-KZ-DauletNeural" # Голос для синтеза
-SPEECH_RECOGNITION_LANGUAGE = "kk-KZ"   # Язык распознавания
+SPEECH_VOICE_NAME = "kk-KZ-DauletNeural"
+SPEECH_RECOGNITION_LANGUAGE = "kk-KZ"
 
-# Конфигурация Azure OpenAI
 AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 OPENAI_API_VERSION = os.getenv("OPENAI_API_VERSION")
 AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
-# Системный промпт для ассистента
 SYSTEM_PROMPT = "Сен – тарих пәнінің сарапшысы, Батыр атты AI-көмекшісің. Қысқа, құрметпен және мәні бойынша жауап бер. Сенің міндетің – білім беру. Пайдаланушымен сұхбат жүргіз."
 
 # --- 3. Проверки и инициализация клиентов ---
@@ -53,12 +50,11 @@ except Exception as e:
     logging.error(f"Не удалось инициализировать клиент Azure OpenAI: {e}")
     raise
 
-# --- 4. Pydantic-модели для валидации и документации ---
+# --- 4. Pydantic-модели ---
 class AssistantResponse(BaseModel):
     userText: str = Field(..., description="Распознанный текст пользователя.")
     assistantText: str = Field(..., description="Текстовый ответ ассистента.")
     audioBase64: str = Field(..., description="Аудиоответ в формате Base64.")
-
 
 # --- 5. Приложение FastAPI ---
 app = FastAPI(
@@ -66,27 +62,37 @@ app = FastAPI(
     description="Отдельный сервис для голосового AI-ассистента.",
     version="1.0.0"
 )
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # В продакшене лучше указать конкретный домен фронтенда
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# --- 6. Вспомогательные функции ---
 
-# --- 6. Вспомогательные функции с улучшенным логированием ---
-
-def recognize_speech_from_bytes(audio_bytes: bytes) -> str:
-    """Конвертирует аудио-байты и распознает речь с помощью Azure Speech."""
+# ⭐⭐⭐ ИЗМЕНЕННАЯ ФУНКЦИЯ ДЛЯ ОТЛАДКИ ⭐⭐⭐
+def recognize_speech_from_bytes(audio_bytes: bytes, original_filename: str) -> str:
     logging.info(f"Начало распознавания речи. Получено байтов: {len(audio_bytes)}")
     
-    if len(audio_bytes) < 1000: # Проверка на почти пустой файл
+    # Получаем расширение из имени файла, присланного клиентом
+    file_extension = os.path.splitext(original_filename)[1] or ".webm"
+
+    # --- ОТЛАДКА: СОХРАНЕНИЕ ФАЙЛОВ ---
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # 1. Сохраняем то, что пришло от клиента, с правильным расширением
+    input_filename = f"received_{timestamp}{file_extension}"
+    with open(input_filename, "wb") as f:
+        f.write(audio_bytes)
+    logging.info(f"Входящий аудиофайл сохранен как {input_filename}")
+    # --- КОНЕЦ ОТЛАДКИ ---
+
+    if len(audio_bytes) < 1000:
         raise ValueError("Аудиофайл слишком мал или пуст.")
         
     try:
-        # Важно: для этой части на сервере должен быть установлен FFmpeg!
         audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
         logging.info("Аудио успешно загружено в pydub для конвертации.")
         
@@ -96,6 +102,14 @@ def recognize_speech_from_bytes(audio_bytes: bytes) -> str:
         audio_segment.export(wav_buffer, format="wav")
         wav_bytes = wav_buffer.getvalue()
         logging.info("Аудио успешно сконвертировано в WAV 16kHz mono.")
+
+        # --- ОТЛАДКА: СОХРАНЕНИЕ ФАЙЛОВ ---
+        # 2. Сохраняем то, что отправляем в Azure
+        output_filename = f"to_azure_{timestamp}.wav"
+        with open(output_filename, "wb") as f:
+            f.write(wav_bytes)
+        logging.info(f"Конвертированный WAV-файл сохранен как {output_filename}")
+        # --- КОНЕЦ ОТЛАДКИ ---
 
     except Exception as e:
         logging.error(f"🔥 Ошибка конвертации аудио с помощью pydub: {e}", exc_info=True)
@@ -126,49 +140,40 @@ def recognize_speech_from_bytes(audio_bytes: bytes) -> str:
         raise RuntimeError(f"Ошибка сервиса распознавания: {cancellation_details.reason}")
     
     raise RuntimeError("Неизвестная ошибка при распознавании речи.")
+# ⭐⭐⭐ КОНЕЦ ИЗМЕНЕНИЙ В ФУНКЦИИ ⭐⭐⭐
 
 
 def get_answer_from_llm(question: str, history: List[Dict[str, str]]) -> str:
-    """Получает ответ от языковой модели Azure OpenAI."""
+    # (Эта функция без изменений)
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": question}]
     logging.info(f"Отправка запроса в Azure OpenAI с {len(messages)} сообщениями.")
-    
     try:
-        response = AZURE_OPENAI_CLIENT.chat.completions.create(
-            model=AZURE_OPENAI_DEPLOYMENT_NAME,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=150
-        )
+        response = AZURE_OPENAI_CLIENT.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT_NAME, messages=messages, temperature=0.7, max_tokens=150)
         answer = response.choices[0].message.content
         logging.info(f"Ответ от LLM получен: '{answer[:50]}...'")
         return answer
     except Exception as e:
         logging.error(f"🔥 Ошибка при обращении к Azure OpenAI: {e}", exc_info=True)
-        # Пробрасываем ошибку выше, чтобы эндпоинт вернул корректный статус 500
         raise RuntimeError("Ошибка при обращении к сервису OpenAI.")
 
 
 def synthesize_speech_from_text(text: str) -> bytes:
-    """Синтезирует речь из текста с помощью Azure Speech."""
+    # (Эта функция без изменений)
     logging.info(f"Начало синтеза речи для текста: '{text[:50]}...'")
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
     speech_config.speech_synthesis_voice_name = SPEECH_VOICE_NAME
     speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3)
-    
     synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=None)
     result = synthesizer.speak_text_async(text).get()
-    
     if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
         logging.info(f"Синтез речи успешно завершен. Размер аудио: {len(result.audio_data)} байт.")
         return result.audio_data
-    
     cancellation_details = result.cancellation_details
     logging.error(f"Ошибка синтеза речи: {cancellation_details.reason}. Детали: {cancellation_details.error_details}")
     raise RuntimeError(f"Ошибка сервиса синтеза речи: {cancellation_details.reason}")
 
 
-# --- 7. Финальный эндпоинт с улучшенной обработкой ошибок ---
+# --- 7. Финальный эндпоинт ---
 @app.post("/api/ask-assistant", response_model=AssistantResponse)
 async def ask_assistant(
     audio_file: UploadFile = File(...),
@@ -184,16 +189,11 @@ async def ask_assistant(
 
         audio_bytes = await audio_file.read()
         
-        # Шаг 1: Распознать речь
-        recognized_text = recognize_speech_from_bytes(audio_bytes)
+        # ⭐ Передаем имя файла в функцию распознавания
+        recognized_text = recognize_speech_from_bytes(audio_bytes, audio_file.filename)
         
-        # Шаг 2: Получить ответ от LLM
         answer_text = get_answer_from_llm(recognized_text, history)
-        
-        # Шаг 3: Синтезировать аудиоответ
         answer_audio_bytes = synthesize_speech_from_text(answer_text)
-
-        # Шаг 4: Подготовить ответ
         audio_base64 = base64.b64encode(answer_audio_bytes).decode('utf-8')
 
         return AssistantResponse(
@@ -203,10 +203,8 @@ async def ask_assistant(
         )
 
     except ValueError as e:
-        # Ошибки, связанные с неверными данными от клиента (пустое аудио, нераспознанная речь)
         logging.warning(f"Ошибка данных от клиента (400): {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        # Все остальные, непредвиденные ошибки
         logging.error("Произошла непредвиденная ошибка в эндпоинте /api/ask-assistant", exc_info=True)
         raise HTTPException(status_code=500, detail="Произошла непредвиденная внутренняя ошибка ассистента.")
