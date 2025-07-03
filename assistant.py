@@ -76,71 +76,70 @@ app.add_middleware(
 def recognize_speech_from_bytes(audio_bytes: bytes, original_filename: str) -> str:
     logging.info(f"Начало распознавания речи. Получено байтов: {len(audio_bytes)}")
     
-    # Получаем расширение из имени файла, присланного клиентом
     file_extension = os.path.splitext(original_filename)[1] or ".webm"
-
-    # --- ОТЛАДКА: СОХРАНЕНИЕ ФАЙЛОВ ---
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # 1. Сохраняем то, что пришло от клиента, с правильным расширением
-    input_filename = f"received_{timestamp}{file_extension}"
-    with open(input_filename, "wb") as f:
-        f.write(audio_bytes)
-    logging.info(f"Входящий аудиофайл сохранен как {input_filename}")
-    # --- КОНЕЦ ОТЛАДКИ ---
-
-    if len(audio_bytes) < 1000:
-        raise ValueError("Аудиофайл слишком мал или пуст.")
-        
+    # Создаем папку для временных файлов, если ее нет
+    temp_audio_dir = "temp_audio"
+    os.makedirs(temp_audio_dir, exist_ok=True)
+    
     try:
+        # Конвертируем аудио
         audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
-        logging.info("Аудио успешно загружено в pydub для конвертации.")
-        
         audio_segment = audio_segment.set_channels(1).set_frame_rate(16000)
         
-        wav_buffer = io.BytesIO()
-        audio_segment.export(wav_buffer, format="wav")
-        wav_bytes = wav_buffer.getvalue()
-        logging.info("Аудио успешно сконвертировано в WAV 16kHz mono.")
-
-        # --- ОТЛАДКА: СОХРАНЕНИЕ ФАЙЛОВ ---
-        # 2. Сохраняем то, что отправляем в Azure
-        output_filename = f"to_azure_{timestamp}.wav"
-        with open(output_filename, "wb") as f:
-            f.write(wav_bytes)
-        logging.info(f"Конвертированный WAV-файл сохранен как {output_filename}")
-        # --- КОНЕЦ ОТЛАДКИ ---
+        # Сохраняем сконвертированный WAV-файл во временную папку
+        wav_filepath = os.path.join(temp_audio_dir, f"to_azure_{timestamp}.wav")
+        audio_segment.export(wav_filepath, format="wav")
+        logging.info(f"Конвертированный WAV-файл сохранен для распознавания: {wav_filepath}")
 
     except Exception as e:
-        logging.error(f"🔥 Ошибка конвертации аудио с помощью pydub: {e}", exc_info=True)
-        raise ValueError("Не удалось обработать аудиофайл. Убедитесь, что FFmpeg установлен на сервере.")
+        logging.error(f"🔥 Ошибка конвертации аудио: {e}", exc_info=True)
+        raise ValueError("Не удалось обработать аудиофайл.")
 
-    speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION, speech_recognition_language=SPEECH_RECOGNITION_LANGUAGE)
-    stream = speechsdk.audio.PushAudioInputStream()
-    audio_config = speechsdk.audio.AudioConfig(stream=stream)
-    recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-    
-    stream.write(wav_bytes)
-    stream.close()
+    # --- САМОЕ ГЛАВНОЕ ИЗМЕНЕНИЕ: ЧИТАЕМ ИЗ ФАЙЛА ---
+    try:
+        speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION, speech_recognition_language=SPEECH_RECOGNITION_LANGUAGE)
+        
+        # Указываем SDK читать аудио напрямую из сохраненного WAV файла
+        audio_config = speechsdk.audio.AudioConfig(filename=wav_filepath)
+        
+        recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+        
+        logging.info("Начало распознавания из файла...")
+        result = recognizer.recognize_once_async().get()
+        
+    finally:
+        # --- Очистка: удаляем временный файл после использования ---
+        try:
+            os.remove(wav_filepath)
+            logging.info(f"Временный файл {wav_filepath} удален.")
+        except OSError as e:
+            logging.error(f"Не удалось удалить временный файл {wav_filepath}: {e}")
+    # --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
-    result = recognizer.recognize_once_async().get()
 
     if result.reason == speechsdk.ResultReason.RecognizedSpeech:
         if not result.text or result.text.isspace():
             logging.warning("Распознан пустой текст.")
             raise ValueError("Распознан пустой текст.")
-        logging.info(f"Распознано: '{result.text}'")
+        logging.info(f"✅ Распознано: '{result.text}'")
         return result.text
     elif result.reason == speechsdk.ResultReason.NoMatch:
-        logging.warning("Речь не распознана (NoMatch).")
+        logging.warning("Речь не распознана (NoMatch). Вероятно, в файле тишина или шум.")
         raise ValueError("Не удалось распознать речь.")
     elif result.reason == speechsdk.ResultReason.Canceled:
         cancellation_details = result.cancellation_details
         logging.error(f"Ошибка распознавания (Canceled): {cancellation_details.reason}. Детали: {cancellation_details.error_details}")
+        # Эта ошибка часто указывает на проблемы с аутентификацией или подпиской!
+        if cancellation_details.reason == speechsdk.CancellationReason.Error:
+             if cancellation_details.error_code in (speechsdk.CancellationErrorCode.ConnectionFailure, speechsdk.CancellationErrorCode.ServiceUnavailable):
+                  raise RuntimeError("Ошибка сети или сервис Azure недоступен.")
+             if cancellation_details.error_code == speechsdk.CancellationErrorCode.AuthenticationFailure:
+                  raise RuntimeError("Ошибка аутентификации. Проверьте ваш SPEECH_KEY и SPEECH_REGION.")
         raise RuntimeError(f"Ошибка сервиса распознавания: {cancellation_details.reason}")
     
     raise RuntimeError("Неизвестная ошибка при распознавании речи.")
-# ⭐⭐⭐ КОНЕЦ ИЗМЕНЕНИЙ В ФУНКЦИИ ⭐⭐⭐
 
 
 def get_answer_from_llm(question: str, history: List[Dict[str, str]]) -> str:
