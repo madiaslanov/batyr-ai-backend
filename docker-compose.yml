@@ -3,14 +3,14 @@
 version: '3.8'
 
 services:
-  # --- Ваш старый сервис для бэкенда ---
+  # --- Основной бэкенд для генерации фото ---
   batyr-backend:
     build:
       context: .
-      dockerfile: Dockerfile # Явно указываем, какой Dockerfile использовать
+      dockerfile: Dockerfile
     container_name: batyr-backend
-    ports:
-      - "8000:8000"
+    # ports: # <-- УБИРАЕМ, так как Nginx теперь управляет доступом
+    #   - "8000:8000"
     volumes:
       - ./batyr-images:/app/batyr-images
       - ./storage:/app/storage
@@ -23,24 +23,57 @@ services:
       - redis
     networks:
       - batyr-net
-    restart: always # ✅ Рекомендуется добавить, чтобы сервис перезапускался при сбоях
+    restart: always
 
-  # --- ✅ НАШ НОВЫЙ СЕРВИС ДЛЯ БОТА ---
+  # --- ✅ НОВЫЙ СЕРВИС для AI-ассистента ---
+  batyr-assistant:
+    build:
+      context: .
+      dockerfile: assistant.Dockerfile # Убедитесь, что этот файл создан
+    container_name: batyr-assistant
+    # ports: # <-- УБИРАЕМ, Nginx будет главным
+    #   - "8001:8001"
+    env_file:
+      - .env
+    networks:
+      - batyr-net
+    restart: always
+
+  # --- Сервис для Telegram бота ---
   telegram-bot:
     build:
       context: .
-      dockerfile: bot.Dockerfile # Указываем Dockerfile для бота
+      dockerfile: bot.Dockerfile
     container_name: telegram-bot
     env_file:
-      - .env # Используем тот же .env файл
+      - .env
     networks:
       - batyr-net
-    restart: always # Также добавляем авторестарт
+    restart: always
 
-  # --- Ваш старый сервис Redis ---
+  # --- Сервис Redis ---
   redis:
     image: "redis:alpine"
     container_name: redis
+    networks:
+      - batyr-net
+    restart: always
+
+  # --- ✅ НОВЫЙ СЕРВИС: Nginx как главный прокси ---
+  nginx:
+    image: nginx:latest
+    container_name: nginx-proxy
+    ports:
+      - "80:80"   # Открываем стандартные веб-порты наружу
+      - "443:443"
+    volumes:
+      # Пробрасываем наш главный файл конфигурации Nginx
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf 
+      # Пробрасываем сертификаты SSL от Certbot
+      - /etc/letsencrypt:/etc/letsencrypt
+    depends_on:
+      - batyr-backend
+      - batyr-assistant
     networks:
       - batyr-net
     restart: always
