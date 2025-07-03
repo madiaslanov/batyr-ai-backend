@@ -33,12 +33,9 @@ AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 OPENAI_API_VERSION = os.getenv("OPENAI_API_VERSION")
 AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
-# ⭐⭐⭐ ИЗМЕНЕНИЕ 1: Обновляем системный промпт ⭐⭐⭐
-# Добавляем прямое указание на краткость: "Отвечай 1-2 предложениями."
 SYSTEM_PROMPT = "Сен – тарих пәнінің сарапшысы, Батыр атты AI-көмекшісің. Қысқа, құрметпен және мәні бойынша жауап бер. Отвечай 1-2 предложениями. Сенің міндетің – білім беру."
 
 # --- 3. Проверки и инициализация клиентов ---
-# ... (этот блок без изменений)
 if not all([SPEECH_KEY, SPEECH_REGION, AZURE_OPENAI_KEY, AZURE_OPENAI_ENDPOINT, OPENAI_API_VERSION, AZURE_OPENAI_DEPLOYMENT_NAME]):
     raise RuntimeError("Одна или несколько переменных окружения не заданы. Проверьте .env файл.")
 
@@ -54,19 +51,33 @@ except Exception as e:
     raise
 
 # --- 4. Pydantic-модели ---
-# ... (этот блок без изменений)
 class AssistantResponse(BaseModel):
     userText: str = Field(..., description="Распознанный текст пользователя.")
     assistantText: str = Field(..., description="Текстовый ответ ассистента.")
     audioBase64: str = Field(..., description="Аудиоответ в формате Base64.")
 
-# --- 5. Приложение FastAPI ---
-# ... (этот блок без изменений)
-app = FastAPI(
-    title="Batyr AI Assistant API",
-    description="Отдельный сервис для голосового AI-ассистента.",
-    version="1.0.0"
-)
+# --- 5. Приложение FastAPI с условным отключением документации ---
+# Читаем переменную окружения
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+fastapi_kwargs = {
+    "title": "Batyr AI Assistant API",
+    "description": "Отдельный сервис для голосового AI-ассистента.",
+    "version": "1.0.0"
+}
+
+# Если мы на продакшен-сервере, отключаем документацию
+if ENVIRONMENT == "production":
+    fastapi_kwargs["docs_url"] = None
+    fastapi_kwargs["redoc_url"] = None
+    fastapi_kwargs["openapi_url"] = None
+    logging.info("Assistant: Приложение запущено в режиме 'production'. Документация API отключена.")
+else:
+    logging.info("Assistant: Приложение запущено в режиме 'development'. Документация API доступна.")
+
+# Создаем приложение с подготовленными аргументами
+app = FastAPI(**fastapi_kwargs)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -77,8 +88,7 @@ app.add_middleware(
 
 
 # --- 6. Вспомогательные функции ---
-
-# Функция распознавания речи (оставляем надежную версию из файла)
+# (все вспомогательные функции остаются без изменений)
 def recognize_speech_from_bytes(audio_bytes: bytes, original_filename: str) -> str:
     logging.info(f"Начало распознавания речи. Получено байтов: {len(audio_bytes)}")
     
@@ -136,7 +146,6 @@ def recognize_speech_from_bytes(audio_bytes: bytes, original_filename: str) -> s
 
 
 def get_answer_from_llm(question: str, history: List[Dict[str, str]]) -> str:
-    """Получает ответ от языковой модели Azure OpenAI."""
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": question}]
     logging.info(f"Отправка запроса в Azure OpenAI с {len(messages)} сообщениями.")
     
@@ -145,8 +154,7 @@ def get_answer_from_llm(question: str, history: List[Dict[str, str]]) -> str:
             model=AZURE_OPENAI_DEPLOYMENT_NAME,
             messages=messages,
             temperature=0.7,
-            # ⭐⭐⭐ ИЗМЕНЕНИЕ 2: Уменьшаем максимальную длину ответа ⭐⭐⭐
-            max_tokens=80  # Раньше было 150. 80 токенов - это примерно 2-3 предложения.
+            max_tokens=80
         )
         answer = response.choices[0].message.content
         logging.info(f"Ответ от LLM получен: '{answer[:50]}...'")
@@ -157,7 +165,6 @@ def get_answer_from_llm(question: str, history: List[Dict[str, str]]) -> str:
 
 
 def synthesize_speech_from_text(text: str) -> bytes:
-    # ... (эта функция без изменений)
     logging.info(f"Начало синтеза речи для текста: '{text[:50]}...'")
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
     speech_config.speech_synthesis_voice_name = SPEECH_VOICE_NAME
@@ -178,7 +185,6 @@ async def ask_assistant(
     audio_file: UploadFile = File(...),
     history_json: str = Form("[]")
 ):
-    # ... (эта функция без изменений)
     try:
         try:
             history = json.loads(history_json)

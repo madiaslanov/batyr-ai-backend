@@ -15,12 +15,11 @@ from PIL import Image
 import io
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, status, BackgroundTasks, Header
-from fastapi.responses import StreamingResponse 
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import redis
 
-# ✅ Добавляем импорт для модели данных
 from pydantic import BaseModel
 
 from database import init_db, can_user_generate, get_total_users_count
@@ -28,7 +27,6 @@ from database import init_db, can_user_generate, get_total_users_count
 load_dotenv()
 
 # --- Конфигурация ---
-# ... (код этой секции без изменений) ...
 PIAPI_KEY = os.getenv("PIAPI_API_KEY")
 IMAGE_DIR = "/app/batyr-images"
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
@@ -40,7 +38,6 @@ if not PIAPI_KEY:
     raise RuntimeError("Не найден PIAPI_API_KEY в .env файле")
 
 # --- Подключение к Redis ---
-# ... (код этой секции без изменений) ...
 try:
     redis_pool = redis.ConnectionPool(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
     redis_client = redis.Redis(connection_pool=redis_pool)
@@ -52,7 +49,6 @@ except redis.exceptions.ConnectionError as e:
 
 
 # --- Кэш изображений батыров ---
-# ... (код этой секции без изменений) ...
 batyr_images_cache: List[Dict[str, str]] = []
 
 def load_batyr_images_to_cache():
@@ -80,11 +76,27 @@ def load_batyr_images_to_cache():
         print(f"🔥 Критическая ошибка при кэшировании изображений: {e}")
 
 
-# --- Приложение FastAPI ---
-app = FastAPI(
-    title="Batyr AI API",
-    description="API для замены лиц на изображениях батыров с системой лимитов."
-)
+# --- Приложение FastAPI с условным отключением документации ---
+# Читаем переменную окружения
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+fastapi_kwargs = {
+    "title": "Batyr AI API",
+    "description": "API для замены лиц на изображениях батыров с системой лимитов."
+}
+
+# Если мы на продакшен-сервере, отключаем документацию
+if ENVIRONMENT == "production":
+    fastapi_kwargs["docs_url"] = None
+    fastapi_kwargs["redoc_url"] = None
+    fastapi_kwargs["openapi_url"] = None
+    print("Main: Приложение запущено в режиме 'production'. Документация API отключена.")
+else:
+    print("Main: Приложение запущено в режиме 'development'. Документация API доступна.")
+
+# Создаем приложение с подготовленными аргументами
+app = FastAPI(**fastapi_kwargs)
+
 
 @app.on_event("startup")
 def on_startup():
@@ -109,13 +121,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Модель данных для нового эндпоинта
+# --- Модели данных ---
 class PhotoSendRequest(BaseModel):
     imageUrl: str
 
 
 # --- Вспомогательные функции ---
-# ... (все вспомогательные функции без изменений) ...
+# (все вспомогательные функции остаются без изменений)
 def get_random_batyr_image_uri():
     if not batyr_images_cache:
         raise ValueError("Кэш изображений батыров пуст.")
@@ -244,7 +256,6 @@ async def start_face_swap_task(
 
 @app.get("/api/task-status/{job_id}")
 async def get_task_status(job_id: str):
-    # ... (код этой функции без изменений) ...
     try:
         task_data_str = redis_client.get(job_id)
         if not task_data_str:
@@ -253,7 +264,6 @@ async def get_task_status(job_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Ошибка сервера.")
 
-# ✅ НОВЫЙ ЭНДПОИНТ для отправки фото в чат
 @app.post("/api/send-photo-to-chat")
 async def send_photo_to_chat(
     request: PhotoSendRequest,
@@ -267,7 +277,7 @@ async def send_photo_to_chat(
     payload = {
         "chat_id": x_telegram_user_id,
         "photo": request.imageUrl,
-        "caption": "Ваш портрет Батыра готов! ✨\n\nСоздано в @BatyrAI_bot" # Можете добавить юзернейм для виральности
+        "caption": "Ваш портрет Батыра готов! ✨\n\nСоздано в @BatyrAI_bot"
     }
     try:
         async with httpx.AsyncClient() as client:
@@ -279,11 +289,8 @@ async def send_photo_to_chat(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Произошла внутренняя ошибка сервера.")
 
-
-# Старый эндпоинт для скачивания через прокси, можно оставить
 @app.get("/api/download-image")
 async def download_image_proxy(url: str):
-    # ... (код этой функции без изменений) ...
     if not url:
         raise HTTPException(status_code=400, detail="URL не указан.")
     try:
