@@ -14,7 +14,8 @@ import asyncio
 from PIL import Image
 import io
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, status, BackgroundTasks, Header
+from fastapi import FastAPI, HTTPException, UploadFile, File, status, BackgroundTasks, Header, Depends, Security
+from fastapi.security import APIKeyHeader
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -77,15 +78,11 @@ def load_batyr_images_to_cache():
 
 
 # --- Приложение FastAPI с условным отключением документации ---
-# Читаем переменную окружения
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-
 fastapi_kwargs = {
     "title": "Batyr AI API",
     "description": "API для замены лиц на изображениях батыров с системой лимитов."
 }
-
-# Если мы на продакшен-сервере, отключаем документацию
 if ENVIRONMENT == "production":
     fastapi_kwargs["docs_url"] = None
     fastapi_kwargs["redoc_url"] = None
@@ -93,8 +90,6 @@ if ENVIRONMENT == "production":
     print("Main: Приложение запущено в режиме 'production'. Документация API отключена.")
 else:
     print("Main: Приложение запущено в режиме 'development'. Документация API доступна.")
-
-# Создаем приложение с подготовленными аргументами
 app = FastAPI(**fastapi_kwargs)
 
 
@@ -121,13 +116,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# --- ✅ Секция защиты API ---
+API_KEY = os.getenv("API_SECRET_KEY")
+API_KEY_NAME = "X-API-Key"
+
+if not API_KEY:
+    raise RuntimeError("API_SECRET_KEY не задан в .env! Сервис не может быть запущен безопасно.")
+
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+async def get_api_key(api_key: str = Security(api_key_header)):
+    if api_key == API_KEY:
+        return api_key
+    else:
+        raise HTTPException(status_code=403, detail="Could not validate credentials")
+# --- ✅ КОНЕЦ Секции защиты API ---
+
+
 # --- Модели данных ---
 class PhotoSendRequest(BaseModel):
     imageUrl: str
 
 
 # --- Вспомогательные функции ---
-# (все вспомогательные функции остаются без изменений)
+# (остаются без изменений)
 def get_random_batyr_image_uri():
     if not batyr_images_cache:
         raise ValueError("Кэш изображений батыров пуст.")
@@ -216,8 +229,8 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes, user_id: i
         update_job_status(job_id, {"status": "failed", "error": error_msg})
 
 
-# --- Главные эндпоинты ---
-@app.post("/api/start-face-swap", status_code=status.HTTP_202_ACCEPTED)
+# --- Главные эндпоинты с защитой ---
+@app.post("/api/start-face-swap", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(get_api_key)])
 async def start_face_swap_task(
     background_tasks: BackgroundTasks,
     user_photo: UploadFile = File(...),
@@ -254,7 +267,7 @@ async def start_face_swap_task(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при запуске задачи: {str(e)}")
 
-@app.get("/api/task-status/{job_id}")
+@app.get("/api/task-status/{job_id}", dependencies=[Depends(get_api_key)])
 async def get_task_status(job_id: str):
     try:
         task_data_str = redis_client.get(job_id)
@@ -264,7 +277,7 @@ async def get_task_status(job_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Ошибка сервера.")
 
-@app.post("/api/send-photo-to-chat")
+@app.post("/api/send-photo-to-chat", dependencies=[Depends(get_api_key)])
 async def send_photo_to_chat(
     request: PhotoSendRequest,
     x_telegram_user_id: int = Header(..., description="Уникальный ID пользователя Telegram")
@@ -289,22 +302,7 @@ async def send_photo_to_chat(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Произошла внутренняя ошибка сервера.")
 
-@app.get("/api/download-image")
-async def download_image_proxy(url: str):
-    if not url:
-        raise HTTPException(status_code=400, detail="URL не указан.")
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, follow_redirects=True, timeout=30.0)
-            response.raise_for_status()
-            content_type = response.headers.get('content-type', 'application/octet-stream')
-            return StreamingResponse(response.iter_bytes(), media_type=content_type)
-    except httpx.RequestError as e:
-        raise HTTPException(status_code=502, detail=f"Не удалось связаться с сервером изображения: {e}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Произошла внутренняя ошибка при скачивании файла.")
-
-# --- Остальные эндпоинты ---
+# --- Остальные эндпоинты (открытые) ---
 @app.get("/api/stats")
 async def get_app_stats():
     total_users = await get_total_users_count()

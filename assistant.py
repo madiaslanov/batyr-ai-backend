@@ -6,7 +6,8 @@ import base64
 import logging
 import datetime
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Security
+from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 import azure.cognitiveservices.speech as speechsdk
 from openai import AzureOpenAI
@@ -57,16 +58,12 @@ class AssistantResponse(BaseModel):
     audioBase64: str = Field(..., description="Аудиоответ в формате Base64.")
 
 # --- 5. Приложение FastAPI с условным отключением документации ---
-# Читаем переменную окружения
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-
 fastapi_kwargs = {
     "title": "Batyr AI Assistant API",
     "description": "Отдельный сервис для голосового AI-ассистента.",
     "version": "1.0.0"
 }
-
-# Если мы на продакшен-сервере, отключаем документацию
 if ENVIRONMENT == "production":
     fastapi_kwargs["docs_url"] = None
     fastapi_kwargs["redoc_url"] = None
@@ -74,8 +71,6 @@ if ENVIRONMENT == "production":
     logging.info("Assistant: Приложение запущено в режиме 'production'. Документация API отключена.")
 else:
     logging.info("Assistant: Приложение запущено в режиме 'development'. Документация API доступна.")
-
-# Создаем приложение с подготовленными аргументами
 app = FastAPI(**fastapi_kwargs)
 
 app.add_middleware(
@@ -86,9 +81,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- ✅ Секция защиты API ---
+API_KEY = os.getenv("API_SECRET_KEY")
+API_KEY_NAME = "X-API-Key"
+
+if not API_KEY:
+    raise RuntimeError("API_SECRET_KEY не задан в .env! Сервис не может быть запущен безопасно.")
+
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+async def get_api_key(api_key: str = Security(api_key_header)):
+    if api_key == API_KEY:
+        return api_key
+    else:
+        raise HTTPException(status_code=403, detail="Could not validate credentials")
+# --- ✅ КОНЕЦ Секции защиты API ---
+
 
 # --- 6. Вспомогательные функции ---
-# (все вспомогательные функции остаются без изменений)
+# (остаются без изменений)
 def recognize_speech_from_bytes(audio_bytes: bytes, original_filename: str) -> str:
     logging.info(f"Начало распознавания речи. Получено байтов: {len(audio_bytes)}")
     
@@ -150,12 +161,7 @@ def get_answer_from_llm(question: str, history: List[Dict[str, str]]) -> str:
     logging.info(f"Отправка запроса в Azure OpenAI с {len(messages)} сообщениями.")
     
     try:
-        response = AZURE_OPENAI_CLIENT.chat.completions.create(
-            model=AZURE_OPENAI_DEPLOYMENT_NAME,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=80
-        )
+        response = AZURE_OPENAI_CLIENT.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT_NAME, messages=messages, temperature=0.7, max_tokens=80)
         answer = response.choices[0].message.content
         logging.info(f"Ответ от LLM получен: '{answer[:50]}...'")
         return answer
@@ -179,8 +185,8 @@ def synthesize_speech_from_text(text: str) -> bytes:
     raise RuntimeError(f"Ошибка сервиса синтеза речи: {cancellation_details.reason}")
 
 
-# --- 7. Финальный эндпоинт ---
-@app.post("/api/ask-assistant", response_model=AssistantResponse)
+# --- 7. Финальный эндпоинт с защитой ---
+@app.post("/api/ask-assistant", response_model=AssistantResponse, dependencies=[Depends(get_api_key)])
 async def ask_assistant(
     audio_file: UploadFile = File(...),
     history_json: str = Form("[]")
