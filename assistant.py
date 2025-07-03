@@ -95,7 +95,7 @@ def synthesize_speech_from_text(text: str) -> bytes:
 
 
 # --- Единственный эндпоинт этого сервиса ---
-@app.post("/api/ask")
+@app.post("/api/ask-assistant")
 async def ask_assistant(audio_file: UploadFile = File(...)):
     try:
         audio_bytes = await audio_file.read()
