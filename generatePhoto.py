@@ -10,12 +10,12 @@ import time
 from datetime import datetime
 from typing import List, Dict, Optional
 
-# ✅ Импорты для уменьшения изображений
+# Импорты для уменьшения изображений
 from PIL import Image
 import io
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, status, BackgroundTasks, Header
-# ✅ Импорт для потоковой передачи файла
+# Импорт для потоковой передачи файла
 from fastapi.responses import StreamingResponse 
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -163,7 +163,6 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes):
                     error_details = piapi_data.get("error", "Неизвестная ошибка PiAPI")
                     update_job_status(job_id, {"status": "failed", "error": f"PiAPI ошибка: {error_details}"})
                     return
-                # ... (остальная логика опроса)
         update_job_status(job_id, {"status": "timeout", "error": f"Превышено время ожидания ({MAX_POLLING_TIME}с)"})
     except Exception as e:
         error_msg = f"Критическая ошибка в фоновой задаче: {str(e)}"
@@ -180,13 +179,6 @@ async def start_face_swap_task(
     x_telegram_first_name: Optional[str] = Header(None, description="Имя пользователя Telegram")
 ):
     # --- ВРЕМЕННО ОТКЛЮЧЕННЫЕ ЛИМИТЫ ДЛЯ ТЕСТИРОВАНИЯ ---
-    # can_generate, message, remaining_attempts = await can_user_generate(
-    #     user_id=x_telegram_user_id,
-    #     username=x_telegram_username or "N/A",
-    #     first_name=x_telegram_first_name or "N/A"
-    # )
-    # if not can_generate:
-    #     raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=message)
     remaining_attempts = 999 
     # --- КОНЕЦ БЛОКА ---
 
@@ -213,7 +205,7 @@ async def get_task_status(job_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Ошибка сервера.")
 
-# ✅ НОВЫЙ ЭНДПОИНТ ДЛЯ ПРОКСИ-СКАЧИВАНИЯ
+# ✅ ПРАВИЛЬНОЕ МЕСТО ДЛЯ ЭНДПОИНТА СКАЧИВАНИЯ
 @app.get("/api/download-image")
 async def download_image_proxy(url: str):
     if not url:
