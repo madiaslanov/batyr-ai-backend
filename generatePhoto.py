@@ -9,6 +9,7 @@ import json
 import time
 from datetime import datetime
 from typing import List, Dict, Optional
+import asyncio # ✅ Импортируем asyncio
 
 from PIL import Image
 import io
@@ -49,6 +50,7 @@ batyr_images_cache: List[Dict[str, str]] = []
 
 def load_batyr_images_to_cache():
     print("⏳ Загрузка и кэширование изображений батыров...")
+    # ... (код этой функции без изменений)
     try:
         if not os.path.exists(IMAGE_DIR):
             print(f"⚠️ Директория {IMAGE_DIR} не найдена.")
@@ -70,6 +72,7 @@ def load_batyr_images_to_cache():
             print("❌ Изображения для кэширования не найдены.")
     except Exception as e:
         print(f"🔥 Критическая ошибка при кэшировании изображений: {e}")
+
 
 # --- Приложение FastAPI ---
 app = FastAPI(
@@ -114,6 +117,7 @@ def update_job_status(job_id: str, status_data: dict):
         print(f"❌ [Job: {job_id}] Ошибка обновления статуса в Redis: {e}")
 
 def resize_image_to_base64(image_bytes: bytes, max_size: int = 1024) -> str:
+    # ... (код этой функции без изменений)
     try:
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode in ("RGBA", "P"):
@@ -127,8 +131,31 @@ def resize_image_to_base64(image_bytes: bytes, max_size: int = 1024) -> str:
         print(f"🔥 Ошибка при уменьшении изображения: {e}")
         raise ValueError("Не удалось обработать изображение.") from e
 
-# ✅ ИЗМЕНЕННАЯ ФОНОВАЯ ЗАДАЧА С УЛУЧШЕННЫМИ СТАТУСАМИ
-def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes):
+
+# ✅ НОВАЯ ФУНКЦИЯ для отправки сообщений в Telegram
+async def send_telegram_message(user_id: int, text: str):
+    """Асинхронно отправляет сообщение пользователю через Telegram Bot API."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not token:
+        print("⚠️ TELEGRAM_BOT_TOKEN не найден, сообщение не отправлено.")
+        return
+    
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": user_id,
+        "text": text,
+        "parse_mode": "HTML"
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(url, json=payload)
+        print(f"✉️ Сообщение отправлено пользователю {user_id}")
+    except Exception as e:
+        print(f"🔥 Не удалось отправить сообщение пользователю {user_id}: {e}")
+
+
+# ✅ ИЗМЕНЕНА: Функция теперь принимает user_id и отправляет уведомления
+def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes, user_id: int):
     try:
         update_job_status(job_id, {"status": "processing", "message": "⏳ Уменьшаю ваше фото и подбираю образ..."})
         user_photo_data_uri = resize_image_to_base64(user_photo_bytes)
@@ -157,19 +184,20 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes):
                 if piapi_status == "Completed":
                     result_url = piapi_data.get("output", {}).get("image_url")
                     update_job_status(job_id, {"status": "completed", "result_url": result_url, "message": "✅ Изображение готово"})
+                    
+                    # Отправляем уведомление пользователю
+                    asyncio.run(send_telegram_message(
+                        user_id,
+                        "<b>Ваш портрет батыра готов!</b>\n\nВозвращайтесь в приложение, чтобы скачать его."
+                    ))
                     return
                 elif piapi_status == "Failed":
-                    error_details = piapi_data.get("error", "Неизвестная ошибка PiAPI").lower() # Приводим к нижнему регистру для поиска
-
-                    # ✅ НОВАЯ ЛОГИКА: Ищем конкретную ошибку
+                    error_details = piapi_data.get("error", "Неизвестная ошибка PiAPI").lower()
                     if "face not found" in error_details:
                         user_message = "Не удалось найти лицо на фото. Пожалуйста, попробуйте другое, более чёткое изображение."
-                        error_code = "NO_FACE_FOUND"
                     else:
                         user_message = f"PiAPI ошибка: {piapi_data.get('error', 'Неизвестная ошибка')}"
-                        error_code = "GENERIC_PIAPI_ERROR"
-
-                    update_job_status(job_id, {"status": "failed", "error": user_message, "error_code": error_code})
+                    update_job_status(job_id, {"status": "failed", "error": user_message})
                     return
                 elif piapi_status in ["Processing", "Pending", "Staged"]:
                     update_job_status(job_id, {"status": "processing", "message": f"👨‍🎨 Нейросеть рисует... (статус: {piapi_status})"})
@@ -183,7 +211,6 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes):
         update_job_status(job_id, {"status": "failed", "error": error_msg})
 
 
-
 # --- Главные эндпоинты ---
 @app.post("/api/start-face-swap", status_code=status.HTTP_202_ACCEPTED)
 async def start_face_swap_task(
@@ -193,10 +220,7 @@ async def start_face_swap_task(
     x_telegram_username: Optional[str] = Header(None, description="Username пользователя Telegram"),
     x_telegram_first_name: Optional[str] = Header(None, description="Имя пользователя Telegram")
 ):
-    # --- ВРЕМЕННО ОТКЛЮЧЕННЫЕ ЛИМИТЫ ДЛЯ ТЕСТИРОВАНИЯ ---
     remaining_attempts = 999 
-    # --- КОНЕЦ БЛОКА ---
-
     job_id = str(uuid.uuid4())
     try:
         if not user_photo.content_type.startswith("image/"):
@@ -204,12 +228,16 @@ async def start_face_swap_task(
         user_photo_bytes = await user_photo.read()
         initial_status = {"status": "accepted", "job_id": job_id, "message": "⏳ Генерация изображения..."}
         update_job_status(job_id, initial_status)
-        background_tasks.add_task(run_face_swap_in_background, job_id, user_photo_bytes)
+        
+        # ✅ Передаем user_id в фоновую задачу
+        background_tasks.add_task(run_face_swap_in_background, job_id, user_photo_bytes, x_telegram_user_id)
+        
         print(f"👍 [Job: {job_id}] Задача принята для пользователя {x_telegram_user_id}.")
         return { "job_id": job_id, "status": "accepted", "message": "Задача принята в обработку.", "remaining_attempts": remaining_attempts }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при запуске задачи: {str(e)}")
 
+# ... (остальные эндпоинты: /api/task-status, /api/download-image, /api/stats, /api/health без изменений) ...
 @app.get("/api/task-status/{job_id}")
 async def get_task_status(job_id: str):
     try:
