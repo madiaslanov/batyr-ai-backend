@@ -194,29 +194,34 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes, user_id: i
 
 
 # --- Главные эндпоинты ---
+# ✅ ИЗМЕНЕНА: Функция теперь декодирует имена из Base64
 @app.post("/api/start-face-swap", status_code=status.HTTP_202_ACCEPTED)
 async def start_face_swap_task(
     background_tasks: BackgroundTasks,
     user_photo: UploadFile = File(...),
     x_telegram_user_id: int = Header(..., description="Уникальный ID пользователя Telegram"),
-    x_telegram_username: Optional[str] = Header(None, description="Username пользователя Telegram"),
-    x_telegram_first_name: Optional[str] = Header(None, description="Имя пользователя Telegram")
+    x_telegram_username: Optional[str] = Header(None, description="Username пользователя Telegram (Base64)"),
+    x_telegram_first_name: Optional[str] = Header(None, description="Имя пользователя Telegram (Base64)")
 ):
-    # ✅ --- НАЧАЛО БЛОКА: ЛИМИТЫ СНОВА ВКЛЮЧЕНЫ ---
+    # Декодируем заголовки из Base64
+    try:
+        decoded_username = base64.b64decode(x_telegram_username).decode('utf-8') if x_telegram_username else "unknown"
+        decoded_first_name = base64.b64decode(x_telegram_first_name).decode('utf-8') if x_telegram_first_name else "unknown"
+    except Exception:
+        # Обработка на случай, если придет не-base64 строка (например, от старой версии фронта)
+        decoded_username = x_telegram_username or "unknown"
+        decoded_first_name = x_telegram_first_name or "unknown"
+
+    # Проверяем лимиты
     can_generate, message, remaining_attempts = await can_user_generate(
         user_id=x_telegram_user_id,
-        username=x_telegram_username or "N/A",
-        first_name=x_telegram_first_name or "N/A"
+        username=decoded_username,
+        first_name=decoded_first_name
     )
-    
     if not can_generate:
-        # Если лимит исчерпан, возвращаем ошибку 429 Too Many Requests
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=message
-        )
-    # ✅ --- КОНЕЦ БЛОКА ---
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=message)
 
+    # Продолжаем логику
     job_id = str(uuid.uuid4())
     try:
         if not user_photo.content_type.startswith("image/"):
@@ -224,9 +229,10 @@ async def start_face_swap_task(
         user_photo_bytes = await user_photo.read()
         initial_status = {"status": "accepted", "job_id": job_id, "message": "⏳ Генерация изображения..."}
         update_job_status(job_id, initial_status)
+        
         background_tasks.add_task(run_face_swap_in_background, job_id, user_photo_bytes, x_telegram_user_id)
         
-        print(f"👍 [Job: {job_id}] Задача принята для пользователя {x_telegram_user_id}.")
+        print(f"👍 [Job: {job_id}] Задача принята для пользователя {x_telegram_user_id} ({decoded_first_name}).")
         return { 
             "job_id": job_id, 
             "status": "accepted", 
