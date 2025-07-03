@@ -1,16 +1,15 @@
 # docker-compose.yml
-
 version: '3.8'
 
 services:
   # --- Основной бэкенд для генерации фото ---
+  # Доступен внутри Docker по имени 'batyr-backend' на порту 8000
   batyr-backend:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: batyr-backend
-    # ports: # <-- УБИРАЕМ, так как Nginx теперь управляет доступом
-    #   - "8000:8000"
+    # Порты не выставляем наружу, Nginx будет с ним общаться внутри сети
     volumes:
       - ./batyr-images:/app/batyr-images
       - ./storage:/app/storage
@@ -25,14 +24,13 @@ services:
       - batyr-net
     restart: always
 
-  # --- ✅ НОВЫЙ СЕРВИС для AI-ассистента ---
+  # --- Сервис для AI-ассистента ---
+  # Доступен внутри Docker по имени 'batyr-assistant' на порту 8001
   batyr-assistant:
     build:
       context: .
-      dockerfile: assistant.Dockerfile # Убедитесь, что этот файл создан
+      dockerfile: assistant.Dockerfile
     container_name: batyr-assistant
-    # ports: # <-- УБИРАЕМ, Nginx будет главным
-    #   - "8001:8001"
     env_file:
       - .env
     networks:
@@ -40,6 +38,7 @@ services:
     restart: always
 
   # --- Сервис для Telegram бота ---
+  # Ему не нужны порты, он сам ходит в Telegram
   telegram-bot:
     build:
       context: .
@@ -52,6 +51,7 @@ services:
     restart: always
 
   # --- Сервис Redis ---
+  # Доступен внутри Docker по имени 'redis'
   redis:
     image: "redis:alpine"
     container_name: redis
@@ -59,18 +59,20 @@ services:
       - batyr-net
     restart: always
 
-  # --- ✅ НОВЫЙ СЕРВИС: Nginx как главный прокси ---
+  # --- Главный прокси-сервер Nginx ---
+  # Он принимает все внешние запросы и распределяет их по внутренним сервисам
   nginx:
     image: nginx:latest
     container_name: nginx-proxy
     ports:
-      - "80:80"   # Открываем стандартные веб-порты наружу
+      # Эти порты "смотрят" в интернет
+      - "80:80"
       - "443:443"
     volumes:
-      # Пробрасываем наш главный файл конфигурации Nginx
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf 
-      # Пробрасываем сертификаты SSL от Certbot
-      - /etc/letsencrypt:/etc/letsencrypt
+      # Пробрасываем наш файл с настройками маршрутизации
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      # Пробрасываем сертификаты, чтобы Nginx мог работать с HTTPS
+      - /etc/letsencrypt:/etc/letsencrypt:ro # :ro - только для чтения, более безопасно
     depends_on:
       - batyr-backend
       - batyr-assistant
