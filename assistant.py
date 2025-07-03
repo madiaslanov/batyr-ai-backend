@@ -62,8 +62,8 @@ def recognize_speech_from_bytes(audio_bytes: bytes) -> str:
             f.write(audio_bytes)
         print(f"Сохранен входящий файл: {input_filepath}, размер: {len(audio_bytes)} байт")
 
-        # 2. Говорим pydub загрузить аудио из этого файла. Это самый надежный способ.
-        audio_segment = AudioSegment.from_file(input_filepath)
+        # 2. Говорим pydub загрузить аудио из этого файла, явно указав формат
+        audio_segment = AudioSegment.from_file(input_filepath, format="webm")
 
         # 3. Конвертируем в нужный формат: WAV, 16kHz, моно
         audio_segment = audio_segment.set_channels(1).set_frame_rate(16000)
