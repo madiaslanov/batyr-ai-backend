@@ -53,17 +53,44 @@ app.add_middleware(
 
 # --- Вспомогательные функции ---
 def recognize_speech_from_bytes(audio_bytes: bytes) -> str:
-    # ... (код этой функции остается без изменений) ...
-    speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION, speech_recognition_language="kk-KZ")
-    audio_config = speechsdk.audio.PushAudioInputStream(io.BytesIO(audio_bytes))
+    speech_config = speechsdk.SpeechConfig(
+        subscription=SPEECH_KEY, 
+        region=SPEECH_REGION,
+        speech_recognition_language="kk-KZ"
+    )
+
+    # ✅ ИЗМЕНЕНИЕ ЗДЕСЬ
+    # Создаем AudioConfig, который работает с потоком байтов в памяти.
+    # Это правильный способ для Azure Speech SDK.
+    stream = speechsdk.audio.PushAudioInputStream()
+    audio_config = speechsdk.audio.AudioConfig(stream=stream)
+    
+    # Создаем распознаватель с новой конфигурацией
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+    
+    # "Скармливаем" наши байты в поток
+    stream.write(audio_bytes)
+    stream.close() # Важно закрыть поток, чтобы SDK знало, что аудио закончилось
+
+    # Распознаем
     result = recognizer.recognize_once_async().get()
+
     if result.reason == speechsdk.ResultReason.RecognizedSpeech:
         print(f"Распознано: '{result.text}'")
         return result.text
     elif result.reason == speechsdk.ResultReason.NoMatch:
+        # Этот случай теперь менее вероятен, но оставим для надежности
+        print("Не удалось распознать речь.")
         raise ValueError("Не удалось распознать речь. Попробуйте снова.")
-    raise RuntimeError(f"Ошибка распознавания: {result.cancellation_details.reason}")
+    elif result.reason == speechsdk.ResultReason.Canceled:
+        cancellation_details = result.cancellation_details
+        print(f"Распознавание отменено: {cancellation_details.reason}")
+        if cancellation_details.reason == speechsdk.CancellationReason.Error:
+            print(f"Код ошибки: {cancellation_details.error_details}")
+        raise RuntimeError(f"Ошибка распознавания: {cancellation_details.reason}")
+    
+    # Добавим обработку других возможных статусов
+    raise RuntimeError(f"Неизвестный результат распознавания: {result.reason}")
 
 
 def get_answer_from_llm(question: str) -> str:
