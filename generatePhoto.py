@@ -130,16 +130,12 @@ def resize_image_to_base64(image_bytes: bytes, max_size: int = 1024) -> str:
 # ✅ ИЗМЕНЕННАЯ ФОНОВАЯ ЗАДАЧА С УЛУЧШЕННЫМИ СТАТУСАМИ
 def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes):
     try:
-        # СТАТУС 1: Начало обработки и уменьшение
         update_job_status(job_id, {"status": "processing", "message": "⏳ Уменьшаю ваше фото и подбираю образ..."})
-        
         user_photo_data_uri = resize_image_to_base64(user_photo_bytes)
         target_image_uri = get_random_batyr_image_uri()
-        
         headers = {"x-api-key": PIAPI_KEY, "Content-Type": "application/json"}
         payload = { "model": "Qubico/image-toolkit", "task_type": "face-swap", "input": {"target_image": target_image_uri, "swap_image": user_photo_data_uri} }
         
-        # СТАТУС 2: Отправка в нейросеть
         update_job_status(job_id, {"status": "sending", "message": "🛰️ Отправляю данные в нейросеть..."})
         with httpx.Client(timeout=30.0) as client:
             response = client.post("https://api.piapi.ai/api/v1/task", headers=headers, json=payload)
@@ -155,34 +151,37 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes):
             time.sleep(POLLING_INTERVAL)
             with httpx.Client(timeout=15.0) as client:
                 res = client.get(f"https://api.piapi.ai/api/v1/task/{piapi_task_id}", headers=headers)
-            
             if res.status_code == 200:
                 piapi_data = res.json().get("data", {})
                 piapi_status = piapi_data.get("status", "Unknown").title()
-
                 if piapi_status == "Completed":
                     result_url = piapi_data.get("output", {}).get("image_url")
                     update_job_status(job_id, {"status": "completed", "result_url": result_url, "message": "✅ Изображение готово"})
                     return
                 elif piapi_status == "Failed":
-                    error_details = piapi_data.get("error", "Неизвестная ошибка PiAPI")
-                    update_job_status(job_id, {"status": "failed", "error": f"PiAPI ошибка: {error_details}"})
+                    error_details = piapi_data.get("error", "Неизвестная ошибка PiAPI").lower() # Приводим к нижнему регистру для поиска
+
+                    # ✅ НОВАЯ ЛОГИКА: Ищем конкретную ошибку
+                    if "face not found" in error_details:
+                        user_message = "Не удалось найти лицо на фото. Пожалуйста, попробуйте другое, более чёткое изображение."
+                        error_code = "NO_FACE_FOUND"
+                    else:
+                        user_message = f"PiAPI ошибка: {piapi_data.get('error', 'Неизвестная ошибка')}"
+                        error_code = "GENERIC_PIAPI_ERROR"
+
+                    update_job_status(job_id, {"status": "failed", "error": user_message, "error_code": error_code})
                     return
-                # СТАТУС 3: Нейросеть работает
                 elif piapi_status in ["Processing", "Pending", "Staged"]:
-                    update_job_status(job_id, {
-                        "status": "processing", 
-                        "message": f"👨‍🎨 Нейросеть рисует... (статус: {piapi_status})"
-                    })
+                    update_job_status(job_id, {"status": "processing", "message": f"👨‍🎨 Нейросеть рисует... (статус: {piapi_status})"})
                 else:
                     update_job_status(job_id, {"status": "failed", "error": f"Неизвестный статус PiAPI: {piapi_status}"})
                     return
-        
         update_job_status(job_id, {"status": "timeout", "error": f"Превышено время ожидания ({MAX_POLLING_TIME}с)"})
     except Exception as e:
         error_msg = f"Критическая ошибка в фоновой задаче: {str(e)}"
         traceback.print_exc()
         update_job_status(job_id, {"status": "failed", "error": error_msg})
+
 
 
 # --- Главные эндпоинты ---
