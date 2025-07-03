@@ -41,7 +41,8 @@ origins = [
     "https://batyrai.com",
     "https://www.batyrai.com",
     "https://batyr-ai.vercel.app",
-    "https://batyr-ai-madis-projects-f57aa02c.vercel.app"
+    "https://batyr-ai-madis-projects-f57aa02c.vercel.app",
+     "*"
 ]
 app.add_middleware(
     CORSMiddleware,
