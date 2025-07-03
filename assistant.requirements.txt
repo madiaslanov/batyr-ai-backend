@@ -4,3 +4,4 @@ python-dotenv
 azure-cognitiveservices-speech
 openai
 python-multipart
+pydub
