@@ -4,7 +4,6 @@ import io
 import json
 import base64
 import traceback
-import uuid  # <-- Импорт для создания уникальных имен файлов
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse
@@ -12,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import azure.cognitiveservices.speech as speechsdk
 from openai import AzureOpenAI
 from typing import List
-from pydub import AudioSegment
+from pydub import AudioSegment  # <-- Импорт для конвертации
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -40,6 +39,7 @@ app = FastAPI(
     description="Отдельный сервис для голосового AI-ассистента."
 )
 
+# Настраиваем CORS, разрешая все источники для максимальной совместимости
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -50,46 +50,31 @@ app.add_middleware(
 
 # --- Вспомогательные функции ---
 
-# ✅ ФИНАЛЬНАЯ ВЕРСИЯ ФУНКЦИИ РАСПОЗНАВАНИЯ С МАКСИМАЛЬНО НАДЕЖНОЙ КОНВЕРТАЦИЕЙ
+# ✅ ФИНАЛЬНАЯ, РАБОЧАЯ ФУНКЦИЯ РАСПОЗНАВАНИЯ РЕЧИ
 def recognize_speech_from_bytes(audio_bytes: bytes) -> str:
-    request_id = str(uuid.uuid4())
-    input_filepath = f"/app/debug_audio/{request_id}_input.webm"
-    output_filepath = f"/app/debug_audio/{request_id}_converted.wav"
-    
     try:
-        # 1. Сначала сохраняем полученные байты во временный файл
-        with open(input_filepath, "wb") as f:
-            f.write(audio_bytes)
-        print(f"Сохранен входящий файл: {input_filepath}, размер: {len(audio_bytes)} байт")
-
-        # 2. Говорим pydub загрузить аудио из этого файла, явно указав формат
-        audio_segment = AudioSegment.from_file(input_filepath, format="webm")
-
-        # 3. Конвертируем в нужный формат: WAV, 16kHz, моно
+        # 1. Загружаем аудио из байтов с помощью pydub (автоопределение формата)
+        audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
+        # 2. Конвертируем в нужный формат для Azure: WAV, 16kHz, моно
         audio_segment = audio_segment.set_channels(1).set_frame_rate(16000)
-
-        # 4. Экспортируем сконвертированный файл на диск
-        audio_segment.export(output_filepath, format="wav")
-        
-        # 5. Читаем байты из уже готового, чистого WAV-файла
-        with open(output_filepath, "rb") as f:
-            wav_bytes = f.read()
-        print(f"Сконвертировано в WAV: {output_filepath}, размер: {len(wav_bytes)} байт")
+        # 3. Экспортируем результат в виде байтов WAV в память
+        wav_buffer = io.BytesIO()
+        audio_segment.export(wav_buffer, format="wav")
+        wav_bytes = wav_buffer.getvalue()
 
     except Exception as e:
-        print(f"🔥 Ошибка на этапе конвертации аудио: {e}")
+        print(f"🔥 Ошибка конвертации аудио с помощью pydub: {e}")
         raise ValueError("Не удалось обработать аудиофайл.")
-    finally:
-        # 6. Убираем за собой временные файлы в любом случае
-        if os.path.exists(input_filepath): os.remove(input_filepath)
-        if os.path.exists(output_filepath): os.remove(output_filepath)
 
-    # 7. Работаем с Azure SDK, передавая ему чистые WAV-байты
+    # 4. Работаем с Azure SDK, используя правильный Push-поток
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION, speech_recognition_language="kk-KZ")
+    
     stream = speechsdk.audio.PushAudioInputStream()
     audio_config = speechsdk.audio.AudioConfig(stream=stream)
+    
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     
+    # "Скармливаем" наши сконвертированные WAV-байты в поток
     stream.write(wav_bytes)
     stream.close() 
 
@@ -107,13 +92,17 @@ def recognize_speech_from_bytes(audio_bytes: bytes) -> str:
         if cancellation_details.reason == speechsdk.CancellationReason.Error:
             print(f"Код ошибки: {cancellation_details.error_details}")
         raise RuntimeError(f"Ошибка распознавания: {cancellation_details.reason}")
+    
     raise RuntimeError(f"Неизвестный результат распознавания: {result.reason}")
+
 
 def get_answer_from_llm(question: str, history: List[dict]) -> str:
     system_prompt = "Сен – тарих пәнінің сарапшысы, Батыр атты AI-көмекшісің. Қысқа, құрметпен және мәні бойынша жауап бер. Сенің міндетің – білім беру. Пайдаланушымен сұхбат жүргіз."
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": question}]
+
     try:
-        response = AZURE_OPENAI_CLIENT.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT_NAME, messages=messages, temperature=0.7, max_tokens=150)
+        response = AZURE_OPENAI_CLIENT.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT_NAME, messages=messages, temperature=0.7, max_tokens=150)
         answer = response.choices[0].message.content
         print(f"Ответ от LLM: '{answer}'")
         return answer
@@ -125,26 +114,39 @@ def synthesize_speech_from_text(text: str) -> bytes:
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
     speech_config.speech_synthesis_voice_name = "kk-KZ-DauletNeural"
     speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3)
+    
     synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=None)
     result = synthesizer.speak_text_async(text).get()
+    
     if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
         return result.audio_data
     raise RuntimeError(f"Ошибка синтеза речи: {result.cancellation_details.reason}")
 
 
-# --- ФИНАЛЬНЫЙ, РАБОЧИЙ ЭНДПОИНТ --
+# --- ФИНАЛЬНЫЙ, РАБОЧИЙ ЭНДПОИНТ ---
 @app.post("/api/ask-assistant")
-async def ask_assistant(audio_file: UploadFile = File(...), history_json: str = Form("[]")):
+async def ask_assistant(
+    audio_file: UploadFile = File(...),
+    history_json: str = Form("[]")
+):
     try:
         history = json.loads(history_json)
         if not isinstance(history, list):
             history = []
+
         audio_bytes = await audio_file.read()
         recognized_text = recognize_speech_from_bytes(audio_bytes)
         answer_text = get_answer_from_llm(recognized_text, history)
         answer_audio_bytes = synthesize_speech_from_text(answer_text)
+
         audio_base64 = base64.b64encode(answer_audio_bytes).decode('utf-8')
-        return JSONResponse(content={"userText": recognized_text, "assistantText": answer_text, "audioBase64": audio_base64})
+
+        return JSONResponse(content={
+            "userText": recognized_text,
+            "assistantText": answer_text,
+            "audioBase64": audio_base64
+        })
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
