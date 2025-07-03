@@ -4,7 +4,7 @@ import io
 import json
 import base64
 import logging
-import datetime  # Добавлен импорт для временных меток
+import datetime
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,9 +33,12 @@ AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 OPENAI_API_VERSION = os.getenv("OPENAI_API_VERSION")
 AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
-SYSTEM_PROMPT = "Сен – тарих пәнінің сарапшысы, Батыр атты AI-көмекшісің. Қысқа, құрметпен және мәні бойынша жауап бер. Сенің міндетің – білім беру. Пайдаланушымен сұхбат жүргіз."
+# ⭐⭐⭐ ИЗМЕНЕНИЕ 1: Обновляем системный промпт ⭐⭐⭐
+# Добавляем прямое указание на краткость: "Отвечай 1-2 предложениями."
+SYSTEM_PROMPT = "Сен – тарих пәнінің сарапшысы, Батыр атты AI-көмекшісің. Қысқа, құрметпен және мәні бойынша жауап бер. Отвечай 1-2 предложениями. Сенің міндетің – білім беру."
 
 # --- 3. Проверки и инициализация клиентов ---
+# ... (этот блок без изменений)
 if not all([SPEECH_KEY, SPEECH_REGION, AZURE_OPENAI_KEY, AZURE_OPENAI_ENDPOINT, OPENAI_API_VERSION, AZURE_OPENAI_DEPLOYMENT_NAME]):
     raise RuntimeError("Одна или несколько переменных окружения не заданы. Проверьте .env файл.")
 
@@ -51,12 +54,14 @@ except Exception as e:
     raise
 
 # --- 4. Pydantic-модели ---
+# ... (этот блок без изменений)
 class AssistantResponse(BaseModel):
     userText: str = Field(..., description="Распознанный текст пользователя.")
     assistantText: str = Field(..., description="Текстовый ответ ассистента.")
     audioBase64: str = Field(..., description="Аудиоответ в формате Base64.")
 
 # --- 5. Приложение FastAPI ---
+# ... (этот блок без изменений)
 app = FastAPI(
     title="Batyr AI Assistant API",
     description="Отдельный сервис для голосового AI-ассистента.",
@@ -70,25 +75,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # --- 6. Вспомогательные функции ---
 
-# ⭐⭐⭐ ИЗМЕНЕННАЯ ФУНКЦИЯ ДЛЯ ОТЛАДКИ ⭐⭐⭐
+# Функция распознавания речи (оставляем надежную версию из файла)
 def recognize_speech_from_bytes(audio_bytes: bytes, original_filename: str) -> str:
     logging.info(f"Начало распознавания речи. Получено байтов: {len(audio_bytes)}")
     
-    file_extension = os.path.splitext(original_filename)[1] or ".webm"
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    # Создаем папку для временных файлов, если ее нет
     temp_audio_dir = "temp_audio"
     os.makedirs(temp_audio_dir, exist_ok=True)
     
     try:
-        # Конвертируем аудио
         audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
         audio_segment = audio_segment.set_channels(1).set_frame_rate(16000)
         
-        # Сохраняем сконвертированный WAV-файл во временную папку
         wav_filepath = os.path.join(temp_audio_dir, f"to_azure_{timestamp}.wav")
         audio_segment.export(wav_filepath, format="wav")
         logging.info(f"Конвертированный WAV-файл сохранен для распознавания: {wav_filepath}")
@@ -97,27 +98,20 @@ def recognize_speech_from_bytes(audio_bytes: bytes, original_filename: str) -> s
         logging.error(f"🔥 Ошибка конвертации аудио: {e}", exc_info=True)
         raise ValueError("Не удалось обработать аудиофайл.")
 
-    # --- САМОЕ ГЛАВНОЕ ИЗМЕНЕНИЕ: ЧИТАЕМ ИЗ ФАЙЛА ---
     try:
         speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION, speech_recognition_language=SPEECH_RECOGNITION_LANGUAGE)
-        
-        # Указываем SDK читать аудио напрямую из сохраненного WAV файла
         audio_config = speechsdk.audio.AudioConfig(filename=wav_filepath)
-        
         recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
         
         logging.info("Начало распознавания из файла...")
         result = recognizer.recognize_once_async().get()
         
     finally:
-        # --- Очистка: удаляем временный файл после использования ---
         try:
             os.remove(wav_filepath)
             logging.info(f"Временный файл {wav_filepath} удален.")
         except OSError as e:
             logging.error(f"Не удалось удалить временный файл {wav_filepath}: {e}")
-    # --- КОНЕЦ ИЗМЕНЕНИЯ ---
-
 
     if result.reason == speechsdk.ResultReason.RecognizedSpeech:
         if not result.text or result.text.isspace():
@@ -131,7 +125,6 @@ def recognize_speech_from_bytes(audio_bytes: bytes, original_filename: str) -> s
     elif result.reason == speechsdk.ResultReason.Canceled:
         cancellation_details = result.cancellation_details
         logging.error(f"Ошибка распознавания (Canceled): {cancellation_details.reason}. Детали: {cancellation_details.error_details}")
-        # Эта ошибка часто указывает на проблемы с аутентификацией или подпиской!
         if cancellation_details.reason == speechsdk.CancellationReason.Error:
              if cancellation_details.error_code in (speechsdk.CancellationErrorCode.ConnectionFailure, speechsdk.CancellationErrorCode.ServiceUnavailable):
                   raise RuntimeError("Ошибка сети или сервис Azure недоступен.")
@@ -143,11 +136,18 @@ def recognize_speech_from_bytes(audio_bytes: bytes, original_filename: str) -> s
 
 
 def get_answer_from_llm(question: str, history: List[Dict[str, str]]) -> str:
-    # (Эта функция без изменений)
+    """Получает ответ от языковой модели Azure OpenAI."""
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": question}]
     logging.info(f"Отправка запроса в Azure OpenAI с {len(messages)} сообщениями.")
+    
     try:
-        response = AZURE_OPENAI_CLIENT.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT_NAME, messages=messages, temperature=0.7, max_tokens=150)
+        response = AZURE_OPENAI_CLIENT.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT_NAME,
+            messages=messages,
+            temperature=0.7,
+            # ⭐⭐⭐ ИЗМЕНЕНИЕ 2: Уменьшаем максимальную длину ответа ⭐⭐⭐
+            max_tokens=80  # Раньше было 150. 80 токенов - это примерно 2-3 предложения.
+        )
         answer = response.choices[0].message.content
         logging.info(f"Ответ от LLM получен: '{answer[:50]}...'")
         return answer
@@ -157,7 +157,7 @@ def get_answer_from_llm(question: str, history: List[Dict[str, str]]) -> str:
 
 
 def synthesize_speech_from_text(text: str) -> bytes:
-    # (Эта функция без изменений)
+    # ... (эта функция без изменений)
     logging.info(f"Начало синтеза речи для текста: '{text[:50]}...'")
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
     speech_config.speech_synthesis_voice_name = SPEECH_VOICE_NAME
@@ -178,6 +178,7 @@ async def ask_assistant(
     audio_file: UploadFile = File(...),
     history_json: str = Form("[]")
 ):
+    # ... (эта функция без изменений)
     try:
         try:
             history = json.loads(history_json)
@@ -188,7 +189,6 @@ async def ask_assistant(
 
         audio_bytes = await audio_file.read()
         
-        # ⭐ Передаем имя файла в функцию распознавания
         recognized_text = recognize_speech_from_bytes(audio_bytes, audio_file.filename)
         
         answer_text = get_answer_from_llm(recognized_text, history)
@@ -200,7 +200,6 @@ async def ask_assistant(
             assistantText=answer_text,
             audioBase64=audio_base64
         )
-
     except ValueError as e:
         logging.warning(f"Ошибка данных от клиента (400): {e}")
         raise HTTPException(status_code=400, detail=str(e))
