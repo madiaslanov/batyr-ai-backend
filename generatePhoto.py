@@ -10,11 +10,13 @@ import time
 from datetime import datetime
 from typing import List, Dict, Optional
 
-# ✅ ДОБАВЛЕНО: Импорты для уменьшения изображений
+# ✅ Импорты для уменьшения изображений
 from PIL import Image
 import io
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, status, BackgroundTasks, Header
+# ✅ Импорт для потоковой передачи файла
+from fastapi.responses import StreamingResponse 
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import redis
@@ -113,9 +115,7 @@ def update_job_status(job_id: str, status_data: dict):
     except Exception as e:
         print(f"❌ [Job: {job_id}] Ошибка обновления статуса в Redis: {e}")
 
-# ✅ НОВАЯ ФУНКЦИЯ ДЛЯ УМЕНЬШЕНИЯ ИЗОБРАЖЕНИЯ
 def resize_image_to_base64(image_bytes: bytes, max_size: int = 1024) -> str:
-    """Уменьшает изображение до max_size по большей стороне и возвращает его в виде data URI."""
     try:
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode in ("RGBA", "P"):
@@ -129,21 +129,13 @@ def resize_image_to_base64(image_bytes: bytes, max_size: int = 1024) -> str:
         print(f"🔥 Ошибка при уменьшении изображения: {e}")
         raise ValueError("Не удалось обработать изображение.") from e
 
-# ✅ ИЗМЕНЕННАЯ ФОНОВАЯ ЗАДАЧА
 def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes):
     try:
         update_job_status(job_id, {"status": "processing", "message": "Уменьшение изображения..."})
-        
-        # Уменьшаем фото пользователя перед отправкой
         user_photo_data_uri = resize_image_to_base64(user_photo_bytes)
         target_image_uri = get_random_batyr_image_uri()
-        
         headers = {"x-api-key": PIAPI_KEY, "Content-Type": "application/json"}
-        payload = {
-            "model": "Qubico/image-toolkit",
-            "task_type": "face-swap",
-            "input": {"target_image": target_image_uri, "swap_image": user_photo_data_uri}
-        }
+        payload = { "model": "Qubico/image-toolkit", "task_type": "face-swap", "input": {"target_image": target_image_uri, "swap_image": user_photo_data_uri} }
         
         update_job_status(job_id, {"status": "sending", "message": "Отправка запроса в PiAPI"})
         with httpx.Client(timeout=30.0) as client:
@@ -154,13 +146,12 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes):
         piapi_task_id = task_response.get("data", {}).get("task_id")
         if not piapi_task_id:
             raise ValueError(f"Не получен task_id от PiAPI: {task_response}")
-
+        
         start_time = time.monotonic()
         while time.monotonic() - start_time < MAX_POLLING_TIME:
             time.sleep(POLLING_INTERVAL)
             with httpx.Client(timeout=15.0) as client:
                 res = client.get(f"https://api.piapi.ai/api/v1/task/{piapi_task_id}", headers=headers)
-            
             if res.status_code == 200:
                 piapi_data = res.json().get("data", {})
                 piapi_status = piapi_data.get("status", "Unknown").title()
@@ -172,20 +163,14 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes):
                     error_details = piapi_data.get("error", "Неизвестная ошибка PiAPI")
                     update_job_status(job_id, {"status": "failed", "error": f"PiAPI ошибка: {error_details}"})
                     return
-                elif piapi_status in ["Processing", "Pending", "Staged"]:
-                    update_job_status(job_id, {"status": "processing", "piapi_status": piapi_status})
-                else:
-                    update_job_status(job_id, {"status": "failed", "error": f"Неизвестный статус PiAPI: {piapi_status}"})
-                    return
-        
+                # ... (остальная логика опроса)
         update_job_status(job_id, {"status": "timeout", "error": f"Превышено время ожидания ({MAX_POLLING_TIME}с)"})
     except Exception as e:
         error_msg = f"Критическая ошибка в фоновой задаче: {str(e)}"
         traceback.print_exc()
         update_job_status(job_id, {"status": "failed", "error": error_msg})
 
-
-# ✅ ИЗМЕНЕННЫЙ ЭНДПОИНТ
+# --- Главные эндпоинты ---
 @app.post("/api/start-face-swap", status_code=status.HTTP_202_ACCEPTED)
 async def start_face_swap_task(
     background_tasks: BackgroundTasks,
@@ -194,56 +179,30 @@ async def start_face_swap_task(
     x_telegram_username: Optional[str] = Header(None, description="Username пользователя Telegram"),
     x_telegram_first_name: Optional[str] = Header(None, description="Имя пользователя Telegram")
 ):
-    """
-    Принимает фото, проверяет лимит пользователя и запускает обработку в фоне.
-    """
-    
-    # --- НАЧАЛО БЛОКА ОТКЛЮЧЕНИЯ ЛИМИТА ---
-    # ✅ ВРЕМЕННО ОТКЛЮЧЕНО: Мы комментируем вызов функции проверки лимита
+    # --- ВРЕМЕННО ОТКЛЮЧЕННЫЕ ЛИМИТЫ ДЛЯ ТЕСТИРОВАНИЯ ---
     # can_generate, message, remaining_attempts = await can_user_generate(
     #     user_id=x_telegram_user_id,
     #     username=x_telegram_username or "N/A",
     #     first_name=x_telegram_first_name or "N/A"
     # )
-    #
-    # ✅ ВРЕМЕННО ОТКЛЮЧЕНО: И проверку, которая блокирует пользователя
     # if not can_generate:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-    #         detail=message
-    #     )
-        
-    # ✅ ДОБАВЛЕНО: Просто устанавливаем "бесконечное" количество попыток для теста
+    #     raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=message)
     remaining_attempts = 999 
-    # --- КОНЕЦ БЛОКА ОТКЛЮЧЕНИЯ ЛИМИТА ---
+    # --- КОНЕЦ БЛОКА ---
 
-
-    # 2. Если лимит в порядке, продолжаем старую логику
     job_id = str(uuid.uuid4())
     try:
         if not user_photo.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="Недопустимый тип файла.")
-        
-        # Читаем байты и передаем их в фоновую задачу для обработки
         user_photo_bytes = await user_photo.read()
-        
         initial_status = {"status": "accepted", "job_id": job_id}
         update_job_status(job_id, initial_status)
-        
         background_tasks.add_task(run_face_swap_in_background, job_id, user_photo_bytes)
-        
         print(f"👍 [Job: {job_id}] Задача принята для пользователя {x_telegram_user_id}.")
-        return {
-            "job_id": job_id,
-            "status": "accepted",
-            "message": "Задача принята в обработку.",
-            "remaining_attempts": remaining_attempts # Используем нашу "фальшивую" переменную
-        }
-        
+        return { "job_id": job_id, "status": "accepted", "message": "Задача принята в обработку.", "remaining_attempts": remaining_attempts }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при запуске задачи: {str(e)}")
 
-# --- Остальные эндпоинты без изменений ---
 @app.get("/api/task-status/{job_id}")
 async def get_task_status(job_id: str):
     try:
@@ -254,13 +213,26 @@ async def get_task_status(job_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Ошибка сервера.")
 
+# ✅ НОВЫЙ ЭНДПОИНТ ДЛЯ ПРОКСИ-СКАЧИВАНИЯ
+@app.get("/api/download-image")
+async def download_image_proxy(url: str):
+    if not url:
+        raise HTTPException(status_code=400, detail="URL не указан.")
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, follow_redirects=True, timeout=30.0)
+            response.raise_for_status()
+            content_type = response.headers.get('content-type', 'application/octet-stream')
+            return StreamingResponse(response.iter_bytes(), media_type=content_type)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Не удалось связаться с сервером изображения: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Произошла внутренняя ошибка при скачивании файла.")
+
 @app.get("/api/stats")
 async def get_app_stats():
     total_users = await get_total_users_count()
-    return {
-        "total_unique_users": total_users,
-        "timestamp": datetime.now().isoformat()
-    }
+    return { "total_unique_users": total_users, "timestamp": datetime.now().isoformat() }
 
 @app.get("/api/health")
 async def health_check():
@@ -270,10 +242,4 @@ async def health_check():
             redis_status = "connected"
     except Exception:
         pass
-    
-    return {
-        "status": "healthy" if redis_status == "connected" else "unhealthy",
-        "redis": redis_status,
-        "batyr_images_cached": len(batyr_images_cache),
-        "timestamp": datetime.now().isoformat()
-    }
+    return { "status": "healthy" if redis_status == "connected" else "unhealthy", "redis": redis_status, "batyr_images_cached": len(batyr_images_cache), "timestamp": datetime.now().isoformat() }
