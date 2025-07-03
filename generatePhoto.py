@@ -10,6 +10,9 @@ import time
 from datetime import datetime
 from typing import List, Dict, Optional
 import asyncio
+import hmac
+import hashlib
+from urllib.parse import unquote
 
 from PIL import Image
 import io
@@ -22,7 +25,6 @@ from dotenv import load_dotenv
 import redis
 
 from pydantic import BaseModel
-
 from database import init_db, can_user_generate, get_total_users_count
 
 load_dotenv()
@@ -47,7 +49,6 @@ try:
 except redis.exceptions.ConnectionError as e:
     print(f"❌ Не удалось подключиться к Redis: {e}")
     redis_client = None
-
 
 # --- Кэш изображений батыров ---
 batyr_images_cache: List[Dict[str, str]] = []
@@ -75,7 +76,6 @@ def load_batyr_images_to_cache():
             print("❌ Изображения для кэширования не найдены.")
     except Exception as e:
         print(f"🔥 Критическая ошибка при кэшировании изображений: {e}")
-
 
 # --- Приложение FastAPI с условным отключением документации ---
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
@@ -116,31 +116,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- ✅ Новая секция защиты API через Telegram initData ---
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+if not BOT_TOKEN:
+    raise RuntimeError("TELEGRAM_BOT_TOKEN не задан! Сервис не может быть запущен безопасно.")
 
-# --- ✅ Секция защиты API ---
-API_KEY = os.getenv("API_SECRET_KEY")
-API_KEY_NAME = "X-API-Key"
+telegram_init_data_header = APIKeyHeader(name="X-Telegram-Init-Data", auto_error=False)
 
-if not API_KEY:
-    raise RuntimeError("API_SECRET_KEY не задан в .env! Сервис не может быть запущен безопасно.")
-
-api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
-
-async def get_api_key(api_key: str = Security(api_key_header)):
-    if api_key == API_KEY:
-        return api_key
-    else:
-        raise HTTPException(status_code=403, detail="Could not validate credentials")
-# --- ✅ КОНЕЦ Секции защиты API ---
-
+async def get_validated_telegram_data(init_data: str = Security(telegram_init_data_header)):
+    if not init_data:
+        raise HTTPException(status_code=401, detail="X-Telegram-Init-Data header is missing")
+    try:
+        unquoted_init_data = unquote(init_data)
+        data_check_string, hash_from_telegram = [], ''
+        for item in sorted(unquoted_init_data.split('&')):
+            key, value = item.split('=', 1)
+            if key == 'hash':
+                hash_from_telegram = value
+            else:
+                data_check_string.append(f"{key}={value}")
+        data_check_string = "\n".join(data_check_string)
+        secret_key = hmac.new("WebAppData".encode(), BOT_TOKEN.encode(), hashlib.sha256).digest()
+        calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        if calculated_hash != hash_from_telegram:
+            raise HTTPException(status_code=403, detail="Invalid data signature")
+        user_data_str = dict(kv.split('=') for kv in unquoted_init_data.split('&')).get('user', '{}')
+        return json.loads(user_data_str)
+    except Exception as e:
+        print(f"Ошибка валидации Telegram initData: {e}")
+        raise HTTPException(status_code=403, detail="Could not validate Telegram credentials.")
 
 # --- Модели данных ---
 class PhotoSendRequest(BaseModel):
     imageUrl: str
 
-
 # --- Вспомогательные функции ---
-# (остаются без изменений)
 def get_random_batyr_image_uri():
     if not batyr_images_cache:
         raise ValueError("Кэш изображений батыров пуст.")
@@ -156,8 +166,7 @@ def update_job_status(job_id: str, status_data: dict):
 def resize_image_to_base64(image_bytes: bytes, max_size: int = 1024) -> str:
     try:
         img = Image.open(io.BytesIO(image_bytes))
-        if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
+        if img.mode in ("RGBA", "P"): img = img.convert("RGB")
         img.thumbnail((max_size, max_size))
         buffer = io.BytesIO()
         img.save(buffer, format="JPEG", quality=85)
@@ -211,10 +220,7 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes, user_id: i
                     return
                 elif piapi_status == "Failed":
                     error_details = piapi_data.get("error", "Неизвестная ошибка PiAPI").lower()
-                    if "face not found" in error_details:
-                        user_message = "Не удалось найти лицо на фото. Пожалуйста, попробуйте другое, более чёткое изображение."
-                    else:
-                        user_message = f"PiAPI ошибка: {piapi_data.get('error', 'Неизвестная ошибка')}"
+                    user_message = "Не удалось найти лицо на фото. Попробуйте другое." if "face not found" in error_details else f"PiAPI ошибка: {piapi_data.get('error', 'Неизвестная ошибка')}"
                     update_job_status(job_id, {"status": "failed", "error": user_message})
                     return
                 elif piapi_status in ["Processing", "Pending", "Staged"]:
@@ -229,8 +235,8 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes, user_id: i
         update_job_status(job_id, {"status": "failed", "error": error_msg})
 
 
-# --- Главные эндпоинты с защитой ---
-@app.post("/api/start-face-swap", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(get_api_key)])
+# --- Главные эндпоинты с новой защитой ---
+@app.post("/api/start-face-swap", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(get_validated_telegram_data)])
 async def start_face_swap_task(
     background_tasks: BackgroundTasks,
     user_photo: UploadFile = File(...),
@@ -245,39 +251,26 @@ async def start_face_swap_task(
         decoded_username = x_telegram_username or "unknown"
         decoded_first_name = x_telegram_first_name or "unknown"
 
-    can_generate, message, remaining_attempts = await can_user_generate(
-        user_id=x_telegram_user_id,
-        username=decoded_username,
-        first_name=decoded_first_name
-    )
+    can_generate, message, remaining_attempts = await can_user_generate(user_id=x_telegram_user_id, username=decoded_username, first_name=decoded_first_name)
     if not can_generate:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=message)
 
     job_id = str(uuid.uuid4())
-    try:
-        if not user_photo.content_type.startswith("image/"):
-            raise HTTPException(status_code=400, detail="Недопустимый тип файла.")
-        user_photo_bytes = await user_photo.read()
-        initial_status = {"status": "accepted", "job_id": job_id, "message": "⏳ Генерация изображения..."}
-        update_job_status(job_id, initial_status)
-        background_tasks.add_task(run_face_swap_in_background, job_id, user_photo_bytes, x_telegram_user_id)
-        
-        print(f"👍 [Job: {job_id}] Задача принята для пользователя {x_telegram_user_id} ({decoded_first_name}).")
-        return { "job_id": job_id, "status": "accepted", "message": "Задача принята в обработку.", "remaining_attempts": remaining_attempts }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка при запуске задачи: {str(e)}")
+    if not user_photo.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Недопустимый тип файла.")
+    user_photo_bytes = await user_photo.read()
+    update_job_status(job_id, {"status": "accepted", "job_id": job_id, "message": "⏳ Генерация изображения..."})
+    background_tasks.add_task(run_face_swap_in_background, job_id, user_photo_bytes, x_telegram_user_id)
+    return { "job_id": job_id, "status": "accepted", "message": "Задача принята в обработку.", "remaining_attempts": remaining_attempts }
 
-@app.get("/api/task-status/{job_id}", dependencies=[Depends(get_api_key)])
+@app.get("/api/task-status/{job_id}", dependencies=[Depends(get_validated_telegram_data)])
 async def get_task_status(job_id: str):
-    try:
-        task_data_str = redis_client.get(job_id)
-        if not task_data_str:
-            raise HTTPException(status_code=404, detail="Задача не найдена.")
-        return json.loads(task_data_str)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Ошибка сервера.")
+    task_data_str = redis_client.get(job_id)
+    if not task_data_str:
+        raise HTTPException(status_code=404, detail="Задача не найдена.")
+    return json.loads(task_data_str)
 
-@app.post("/api/send-photo-to-chat", dependencies=[Depends(get_api_key)])
+@app.post("/api/send-photo-to-chat", dependencies=[Depends(get_validated_telegram_data)])
 async def send_photo_to_chat(
     request: PhotoSendRequest,
     x_telegram_user_id: int = Header(..., description="Уникальный ID пользователя Telegram")
@@ -287,11 +280,7 @@ async def send_photo_to_chat(
         raise HTTPException(status_code=500, detail="Токен бота не настроен на сервере.")
     
     url = f"https://api.telegram.org/bot{token}/sendPhoto"
-    payload = {
-        "chat_id": x_telegram_user_id,
-        "photo": request.imageUrl,
-        "caption": "Ваш портрет Батыра готов! ✨\n\nСоздано в @BatyrAI_bot"
-    }
+    payload = { "chat_id": x_telegram_user_id, "photo": request.imageUrl, "caption": "Ваш портрет Батыра готов! ✨\n\nСоздано в @BatyrAI_bot" }
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, timeout=30.0)
@@ -302,7 +291,22 @@ async def send_photo_to_chat(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Произошла внутренняя ошибка сервера.")
 
-# --- Остальные эндпоинты (открытые) ---
+@app.get("/api/download-image", dependencies=[Depends(get_validated_telegram_data)])
+async def download_image_proxy(url: str):
+    if not url:
+        raise HTTPException(status_code=400, detail="URL не указан.")
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, follow_redirects=True, timeout=30.0)
+            response.raise_for_status()
+            content_type = response.headers.get('content-type', 'application/octet-stream')
+            return StreamingResponse(response.iter_bytes(), media_type=content_type)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Не удалось связаться с сервером изображения: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Произошла внутренняя ошибка при скачивании файла.")
+
+# --- Открытые эндпоинты для мониторинга ---
 @app.get("/api/stats")
 async def get_app_stats():
     total_users = await get_total_users_count()

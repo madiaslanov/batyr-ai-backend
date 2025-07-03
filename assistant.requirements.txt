@@ -5,3 +5,4 @@ azure-cognitiveservices-speech
 openai
 python-multipart
 pydub
+python-telegram-bot

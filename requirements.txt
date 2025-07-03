@@ -9,3 +9,4 @@ aiofiles
 pillow                  
 redis
 Pillow
+python-telegram-bot
