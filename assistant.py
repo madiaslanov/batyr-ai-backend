@@ -132,7 +132,7 @@ def synthesize_speech_from_text(text: str) -> bytes:
     raise RuntimeError(f"Ошибка синтеза речи: {result.cancellation_details.reason}")
 
 
-# --- ФИНАЛЬНЫЙ, РАБОЧИЙ ЭНДПОИНТ ---
+# --- ФИНАЛЬНЫЙ, РАБОЧИЙ ЭНДПОИНТ --
 @app.post("/api/ask-assistant")
 async def ask_assistant(audio_file: UploadFile = File(...), history_json: str = Form("[]")):
     try:
