@@ -17,7 +17,7 @@ from urllib.parse import unquote
 from PIL import Image
 import io
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, status, BackgroundTasks, Header, Depends, Security
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status, BackgroundTasks, Header, Depends, Security
 from fastapi.security import APIKeyHeader
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,7 +31,9 @@ load_dotenv()
 
 # --- Конфигурация ---
 PIAPI_KEY = os.getenv("PIAPI_API_KEY")
-IMAGE_DIR = "/app/batyr-images"
+# Определяем директории для обоих полов
+MALE_IMAGE_DIR = "/app/batyr-images"
+FEMALE_IMAGE_DIR = "/app/batyrKyz-images"
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 MAX_POLLING_TIME = 120
@@ -51,31 +53,43 @@ except redis.exceptions.ConnectionError as e:
     redis_client = None
 
 # --- Кэш изображений батыров ---
-batyr_images_cache: List[Dict[str, str]] = []
+# Теперь это словарь, где ключ - пол, а значение - список изображений
+batyr_images_caches: Dict[str, List[Dict[str, str]]] = {
+    "male": [],
+    "female": []
+}
 
-def load_batyr_images_to_cache():
-    print("⏳ Загрузка и кэширование изображений батыров...")
+def _load_images_from_dir(directory_path: str) -> List[Dict[str, str]]:
+    """Вспомогательная функция для загрузки изображений из одной директории."""
+    images = []
+    print(f"⏳ Загрузка изображений из {directory_path}...")
     try:
-        if not os.path.exists(IMAGE_DIR):
-            print(f"⚠️ Директория {IMAGE_DIR} не найдена.")
-            return
-        for filename in os.listdir(IMAGE_DIR):
+        if not os.path.exists(directory_path):
+            print(f"⚠️ Директория {directory_path} не найдена.")
+            return images
+        for filename in os.listdir(directory_path):
             if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                image_path = os.path.join(IMAGE_DIR, filename)
+                image_path = os.path.join(directory_path, filename)
                 try:
                     with open(image_path, "rb") as image_file:
                         encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
                         mime_type = f"image/{filename.split('.')[-1].lower().replace('jpg', 'jpeg')}"
                         data_uri = f"data:{mime_type};base64,{encoded_string}"
-                        batyr_images_cache.append({"name": filename, "data_uri": data_uri})
+                        images.append({"name": filename, "data_uri": data_uri})
                 except Exception as e:
                     print(f"⚠️ Не удалось обработать файл {filename}: {e}")
-        if batyr_images_cache:
-            print(f"✅ Успешно закэшировано {len(batyr_images_cache)} изображений.")
+        if images:
+            print(f"✅ Успешно закэшировано {len(images)} изображений из {directory_path}.")
         else:
-            print("❌ Изображения для кэширования не найдены.")
+            print(f"❌ Изображения для кэширования в {directory_path} не найдены.")
     except Exception as e:
-        print(f"🔥 Критическая ошибка при кэшировании изображений: {e}")
+        print(f"🔥 Критическая ошибка при кэшировании изображений из {directory_path}: {e}")
+    return images
+
+def load_all_batyr_images_to_cache():
+    """Главная функция для загрузки всех изображений в кэши по полам."""
+    batyr_images_caches["male"] = _load_images_from_dir(MALE_IMAGE_DIR)
+    batyr_images_caches["female"] = _load_images_from_dir(FEMALE_IMAGE_DIR)
 
 # --- Приложение FastAPI ---
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
@@ -91,7 +105,7 @@ app = FastAPI(**fastapi_kwargs)
 @app.on_event("startup")
 def on_startup():
     init_db()
-    load_batyr_images_to_cache()
+    load_all_batyr_images_to_cache()
     if not redis_client: raise RuntimeError("Не удалось установить соединение с Redis.")
 
 # --- Middleware для CORS ---
@@ -150,10 +164,19 @@ class PhotoSendRequest(BaseModel):
 
 
 # --- Вспомогательные функции ---
-def get_random_batyr_image_uri():
-    if not batyr_images_cache:
-        raise ValueError("Кэш изображений батыров пуст.")
-    return random.choice(batyr_images_cache)['data_uri']
+def get_random_batyr_image_uri(gender: str = "male") -> str:
+    # Выбираем кэш в зависимости от пола, по умолчанию 'male'
+    cache_key = gender if gender in batyr_images_caches and batyr_images_caches[gender] else "male"
+    
+    image_cache = batyr_images_caches[cache_key]
+    if not image_cache:
+        # Если для выбранного пола нет картинок, пробуем другой
+        fallback_key = "female" if cache_key == "male" else "male"
+        image_cache = batyr_images_caches.get(fallback_key, [])
+        if not image_cache:
+            raise ValueError("Кэш изображений батыров пуст для обоих полов.")
+    
+    return random.choice(image_cache)['data_uri']
 
 def update_job_status(job_id: str, status_data: dict):
     try:
@@ -189,11 +212,11 @@ async def send_telegram_message(user_id: int, text: str):
     except Exception as e:
         print(f"🔥 Не удалось отправить сообщение пользователю {user_id}: {e}")
 
-def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes, user_id: int):
+def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes, user_id: int, gender: str):
     try:
         update_job_status(job_id, {"status": "processing", "message": "⏳ Уменьшаю ваше фото и подбираю образ..."})
         user_photo_data_uri = resize_image_to_base64(user_photo_bytes)
-        target_image_uri = get_random_batyr_image_uri()
+        target_image_uri = get_random_batyr_image_uri(gender)
         headers = {"x-api-key": PIAPI_KEY, "Content-Type": "application/json"}
         payload = { "model": "Qubico/image-toolkit", "task_type": "face-swap", "input": {"target_image": target_image_uri, "swap_image": user_photo_data_uri} }
         update_job_status(job_id, {"status": "sending", "message": "🛰️ Отправляю данные в нейросеть..."})
@@ -238,6 +261,7 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes, user_id: i
 async def start_face_swap_task(
     background_tasks: BackgroundTasks,
     user_photo: UploadFile = File(...),
+    gender: str = Form("male"),
     validated_user: dict = Depends(get_validated_telegram_data)
 ):
     user_id = validated_user.get('id')
@@ -254,9 +278,9 @@ async def start_face_swap_task(
     
     user_photo_bytes = await user_photo.read()
     update_job_status(job_id, {"status": "accepted", "job_id": job_id, "message": "⏳ Генерация изображения..."})
-    background_tasks.add_task(run_face_swap_in_background, job_id, user_photo_bytes, user_id)
+    background_tasks.add_task(run_face_swap_in_background, job_id, user_photo_bytes, user_id, gender)
     
-    print(f"👍 [Job: {job_id}] Задача принята для пользователя {user_id} ({validated_user.get('first_name', '')}).")
+    print(f"👍 [Job: {job_id}] Задача принята для пользователя {user_id} ({validated_user.get('first_name', '')}, пол: {gender}).")
     return { "job_id": job_id, "status": "accepted", "message": "Задача принята в обработку.", "remaining_attempts": remaining_attempts }
 
 
@@ -321,4 +345,10 @@ async def health_check():
             redis_status = "connected"
     except Exception:
         pass
-    return { "status": "healthy" if redis_status == "connected" else "unhealthy", "redis": redis_status, "batyr_images_cached": len(batyr_images_cache), "timestamp": datetime.now().isoformat() }
+    return { 
+        "status": "healthy" if redis_status == "connected" else "unhealthy", 
+        "redis": redis_status, 
+        "male_images_cached": len(batyr_images_caches.get("male", [])),
+        "female_images_cached": len(batyr_images_caches.get("female", [])),
+        "timestamp": datetime.now().isoformat() 
+    }
