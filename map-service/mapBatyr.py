@@ -14,7 +14,7 @@ except Exception as e:
     print(f"❌ КРИТИЧЕСКАЯ ОШИБКА при загрузке данных: {e}")
     exit()
 
-@app.route('/api/region/<string:region_id>', methods=['GET'])
+@app.route('/<string:region_id>', methods=['GET'])
 def get_region_info(region_id):
     print(f"🐌 Запрос для региона: {region_id}")
     region_data = DB_DATA.get(region_id)
