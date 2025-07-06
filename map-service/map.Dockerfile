@@ -5,7 +5,7 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Копируем файл с зависимостями
-COPY map_requirements.txt .
+COPY map.requirements.txt .
 
 # Устанавливаем зависимости
 RUN pip install --no-cache-dir -r map.requirements.txt
