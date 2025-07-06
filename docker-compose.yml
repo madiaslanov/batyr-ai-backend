@@ -50,6 +50,17 @@ services:
       - batyr-net
     restart: always
 
+
+
+  batyr-map-data:
+    build:
+      context: .
+      dockerfile: map.Dockerfile # Указываем на наш новый Dockerfile
+    container_name: batyr-map-data
+    networks:
+      - batyr-net
+    restart: always
+
   # --- Сервис Redis ---
   # Доступен внутри Docker по имени 'redis'
   redis:
