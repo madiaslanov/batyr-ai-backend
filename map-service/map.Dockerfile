@@ -11,7 +11,7 @@ COPY map.requirements.txt .
 RUN pip install --no-cache-dir -r map.requirements.txt
 
 # Копируем код приложения и файл с данными в контейнер
-COPY mapbatyr.py .
+COPY mapBatyr.py .
 COPY batyrs_data.json .
 
 # Указываем команду для запуска приложения
