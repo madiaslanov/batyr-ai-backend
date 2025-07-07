@@ -3,18 +3,16 @@ version: '3.8'
 
 services:
   # --- Основной бэкенд для генерации фото ---
-  # Доступен внутри Docker по имени 'batyr-backend' на порту 8000
   batyr-backend:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: batyr-backend
-    # Порты не выставляем наружу, Nginx будет с ним общаться внутри сети
     volumes:
       - ./batyr-images:/app/batyr-images
       - ./storage:/app/storage
     env_file:
-      - .env
+      - ./.env # Рекомендуется использовать явный путь
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -25,44 +23,46 @@ services:
     restart: always
 
   # --- Сервис для AI-ассистента ---
-  # Доступен внутри Docker по имени 'batyr-assistant' на порту 8001
   batyr-assistant:
     build:
       context: .
       dockerfile: assistant.Dockerfile
     container_name: batyr-assistant
     env_file:
-      - .env
+      - ./.env # Рекомендуется использовать явный путь
     networks:
       - batyr-net
     restart: always
 
   # --- Сервис для Telegram бота ---
-  # Ему не нужны порты, он сам ходит в Telegram
   telegram-bot:
     build:
       context: .
       dockerfile: bot.Dockerfile
     container_name: telegram-bot
     env_file:
-      - .env
+      - ./.env # Рекомендуется использовать явный путь
     networks:
       - batyr-net
     restart: always
 
-
-
+  # --- Сервис для карты батыров (Flask) ---
   batyr-map-data:
     build:
-      context: ./map-service  # <-- Указываем папку с файлами сервиса
-      dockerfile: map.Dockerfile # Указываем на наш новый Dockerfile
+      context: ./map-service
+      dockerfile: map.Dockerfile
     container_name: batyr-map-data
+    
+    # ✅ ИСПРАВЛЕНИЕ: Указываем явный путь к файлу .env в корне проекта.
+    # Это решает проблему, когда Docker Compose не может найти файл.
+    env_file:
+      - ./.env 
+      
     networks:
       - batyr-net
     restart: always
 
   # --- Сервис Redis ---
-  # Доступен внутри Docker по имени 'redis'
   redis:
     image: "redis:alpine"
     container_name: redis
@@ -71,22 +71,19 @@ services:
     restart: always
 
   # --- Главный прокси-сервер Nginx ---
-  # Он принимает все внешние запросы и распределяет их по внутренним сервисам
   nginx:
     image: nginx:latest
     container_name: nginx-proxy
     ports:
-      # Эти порты "смотрят" в интернет
       - "80:80"
       - "443:443"
     volumes:
-      # Пробрасываем наш файл с настройками маршрутизации
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
-      # Пробрасываем сертификаты, чтобы Nginx мог работать с HTTPS
-      - /etc/letsencrypt:/etc/letsencrypt:ro # :ro - только для чтения, более безопасно
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - batyr-backend
       - batyr-assistant
+      - batyr-map-data
     networks:
       - batyr-net
     restart: always
