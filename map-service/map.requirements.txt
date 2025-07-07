@@ -1,3 +1,6 @@
 flask
 flask-cors
 azure-cognitiveservices-speech
+python-dotenv  
+pydub
+openai
