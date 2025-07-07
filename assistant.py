@@ -17,6 +17,8 @@ from openai import AzureOpenAI
 from typing import List, Dict
 from pydub import AudioSegment
 from pydantic import BaseModel, Field
+from openai import BadRequestError # <-- Добавьте этот импорт вверху файла
+
 
 # --- 1. Настройка логирования ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -133,11 +135,29 @@ def get_answer_from_llm(question: str, history: List[Dict[str, str]]) -> str:
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": question}]
     try:
         response = AZURE_OPENAI_CLIENT.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT_NAME, messages=messages, temperature=0.7, max_tokens=80)
+        
+        # Проверяем, не был ли ответ пустым из-за фильтрации на стороне ответа
+        if not response.choices or not response.choices[0].message.content:
+            logging.warning("Ответ от LLM был отфильтрован content filter'ом (пустой choice).")
+            return "Кешіріңіз, менің жауабым мазмұн саясатына байланысты бұғатталды. Басқаша сұрап көріңізші."
+
         answer = response.choices[0].message.content
         logging.info(f"Ответ от LLM получен: '{answer[:50]}...'")
         return answer
+
+    except BadRequestError as e:
+        # Проверяем, является ли ошибка результатом работы фильтра контента
+        if e.response and e.response.status_code == 400 and e.body and 'content_filter' in e.body.get('code', ''):
+            logging.warning(f"Запрос заблокирован фильтром содержимого Azure: {e.body}")
+            # Возвращаем вежливое сообщение пользователю на казахском
+            return "Кешіріңіз, сұранысыңыз мазмұн саясатына байланысты өңделмеді. Басқаша сұрап көріңізші."
+        else:
+            # Если это другая 400-я ошибка, пробрасываем ее дальше
+            logging.error(f"🔥 Ошибка BadRequest при обращении к Azure OpenAI: {e}", exc_info=True)
+            raise RuntimeError("Ошибка в запросе к сервису OpenAI.")
+
     except Exception as e:
-        logging.error(f"🔥 Ошибка при обращении к Azure OpenAI: {e}", exc_info=True)
+        logging.error(f"🔥 Непредвиденная ошибка при обращении к Azure OpenAI: {e}", exc_info=True)
         raise RuntimeError("Ошибка при обращении к сервису OpenAI.")
 
 def synthesize_speech_from_text(text: str) -> bytes:
