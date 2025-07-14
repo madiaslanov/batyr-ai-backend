@@ -1,4 +1,5 @@
-# main.py
+# Полное содержимое файла main.py
+
 import os
 import httpx
 import base64
@@ -17,21 +18,22 @@ from urllib.parse import unquote
 from PIL import Image
 import io
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status, BackgroundTasks, Header, Depends, Security
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status, BackgroundTasks, Header, Depends, Security, Request
 from fastapi.security import APIKeyHeader
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import redis
+from database import get_db_connection
 
-from pydantic import BaseModel
-from database import init_db, get_or_create_user, can_user_generate, get_total_users_count
+from pydantic import BaseModel, Field
+# Импортируем обновленные функции из database.py
+from database import init_db, get_or_create_user, can_user_generate, add_credits_to_user, get_total_users_count
 
 load_dotenv()
 
 # --- Конфигурация ---
 PIAPI_KEY = os.getenv("PIAPI_API_KEY")
-# Определяем директории для обоих полов
 MALE_IMAGE_DIR = "/app/batyr-images"
 FEMALE_IMAGE_DIR = "/app/batyrKyz-images"
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
@@ -39,8 +41,23 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 MAX_POLLING_TIME = 120
 POLLING_INTERVAL = 2
 
-if not PIAPI_KEY:
-    raise RuntimeError("Не найден PIAPI_API_KEY в .env файле")
+# --- Конфигурация для платежей ---
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+PAYMENT_PROVIDER_TOKEN = os.getenv("TELEGRAM_PAYMENT_PROVIDER_TOKEN")
+WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL")
+WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+# Проверка наличия всех ключевых переменных
+if not all([PIAPI_KEY, BOT_TOKEN, PAYMENT_PROVIDER_TOKEN, WEBHOOK_BASE_URL, WEBHOOK_SECRET_TOKEN]):
+    raise RuntimeError("Одна или несколько критически важных переменных окружения отсутствуют! Проверьте .env файл.")
+
+# --- Пакеты генераций и цены (100 тг = 10000 тиын) ---
+PRICES = {
+    "1_gen": {"title": "1 генерация", "credits": 1, "price_amount": 10000},
+    "5_gen": {"title": "Пакет на 5 генераций", "credits": 5, "price_amount": 45000},
+    "10_gen": {"title": "Пакет на 10 генераций", "credits": 10, "price_amount": 80000},
+}
 
 # --- Подключение к Redis ---
 try:
@@ -53,76 +70,60 @@ except redis.exceptions.ConnectionError as e:
     redis_client = None
 
 # --- Кэш изображений батыров ---
-# Теперь это словарь, где ключ - пол, а значение - список изображений
-batyr_images_caches: Dict[str, List[Dict[str, str]]] = {
-    "male": [],
-    "female": []
-}
+batyr_images_caches: Dict[str, List[Dict[str, str]]] = {"male": [], "female": []}
 
 def _load_images_from_dir(directory_path: str) -> List[Dict[str, str]]:
-    """Вспомогательная функция для загрузки изображений из одной директории."""
     images = []
+    if not os.path.exists(directory_path): return images
     print(f"⏳ Загрузка изображений из {directory_path}...")
-    try:
-        if not os.path.exists(directory_path):
-            print(f"⚠️ Директория {directory_path} не найдена.")
-            return images
-        for filename in os.listdir(directory_path):
-            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                image_path = os.path.join(directory_path, filename)
-                try:
-                    with open(image_path, "rb") as image_file:
-                        encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-                        mime_type = f"image/{filename.split('.')[-1].lower().replace('jpg', 'jpeg')}"
-                        data_uri = f"data:{mime_type};base64,{encoded_string}"
-                        images.append({"name": filename, "data_uri": data_uri})
-                except Exception as e:
-                    print(f"⚠️ Не удалось обработать файл {filename}: {e}")
-        if images:
-            print(f"✅ Успешно закэшировано {len(images)} изображений из {directory_path}.")
-        else:
-            print(f"❌ Изображения для кэширования в {directory_path} не найдены.")
-    except Exception as e:
-        print(f"🔥 Критическая ошибка при кэшировании изображений из {directory_path}: {e}")
+    for filename in os.listdir(directory_path):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+            try:
+                with open(os.path.join(directory_path, filename), "rb") as f:
+                    encoded = base64.b64encode(f.read()).decode('utf-8')
+                    mime = f"image/{filename.split('.')[-1].lower().replace('jpg', 'jpeg')}"
+                    images.append({"name": filename, "data_uri": f"data:{mime};base64,{encoded}"})
+            except Exception as e:
+                print(f"⚠️ Не удалось обработать файл {filename}: {e}")
     return images
 
 def load_all_batyr_images_to_cache():
-    """Главная функция для загрузки всех изображений в кэши по полам."""
     batyr_images_caches["male"] = _load_images_from_dir(MALE_IMAGE_DIR)
     batyr_images_caches["female"] = _load_images_from_dir(FEMALE_IMAGE_DIR)
+    print(f"✅ Кэшировано: {len(batyr_images_caches['male'])} мужских, {len(batyr_images_caches['female'])} женских образов.")
 
 # --- Приложение FastAPI ---
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-fastapi_kwargs = {"title": "Batyr AI API", "description": "API для замены лиц на изображениях батыров."}
+fastapi_kwargs = {"title": "Batyr AI API"}
 if ENVIRONMENT == "production":
-    fastapi_kwargs.update({"docs_url": None, "redoc_url": None, "openapi_url": None})
-    print("Main: 'production' mode. API docs disabled.")
-else:
-    print("Main: 'development' mode. API docs available.")
+    fastapi_kwargs.update({"docs_url": None, "redoc_url": None})
 app = FastAPI(**fastapi_kwargs)
 
+async def set_telegram_webhook():
+    webhook_url = f"{WEBHOOK_BASE_URL.strip('/')}/api/telegram-webhook"
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook",
+            json={"url": webhook_url, "secret_token": WEBHOOK_SECRET_TOKEN, "allowed_updates": ["pre_checkout_query", "message"]}
+        )
+        if response.status_code == 200 and response.json().get("ok"):
+            print(f"✅ Вебхук успешно установлен на: {webhook_url}")
+        else:
+            print(f"❌ ОШИБКА установки вебхука: {response.text}")
+            print("❌ Убедитесь, что WEBHOOK_BASE_URL указан корректно (HTTPS) и доступен из интернета.")
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     init_db()
     load_all_batyr_images_to_cache()
     if not redis_client: raise RuntimeError("Не удалось установить соединение с Redis.")
+    await set_telegram_webhook()
 
-# --- Middleware для CORS ---
 origins = ["http://localhost:3000", "https://batyrai.com", "https://www.batyrai.com", "https://batyr-ai.vercel.app", "https://batyr-ai-madis-projects-f57aa02c.vercel.app"]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-
-# --- ✅ Безопасная секция авторизации через Telegram initData ---
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-if not BOT_TOKEN:
-    raise RuntimeError("TELEGRAM_BOT_TOKEN не задан! Сервис не может быть запущен безопасно.")
-
 telegram_init_data_header = APIKeyHeader(name="X-Telegram-Init-Data", auto_error=False)
-
 async def get_validated_telegram_data(init_data: str = Security(telegram_init_data_header)):
-    if not init_data:
-        raise HTTPException(status_code=401, detail="X-Telegram-Init-Data header is missing")
+    if not init_data: raise HTTPException(status_code=401, detail="X-Telegram-Init-Data header is missing")
     try:
         unquoted_init_data = unquote(init_data)
         data_check_string, hash_from_telegram = [], ''
@@ -135,53 +136,36 @@ async def get_validated_telegram_data(init_data: str = Security(telegram_init_da
         data_check_string = "\n".join(data_check_string)
         secret_key = hmac.new("WebAppData".encode(), BOT_TOKEN.encode(), hashlib.sha256).digest()
         calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-
-        if calculated_hash != hash_from_telegram:
-            raise HTTPException(status_code=403, detail="Invalid data signature")
-
+        if calculated_hash != hash_from_telegram: raise HTTPException(status_code=403, detail="Invalid data signature")
         user_data_dict = dict(kv.split('=') for kv in unquoted_init_data.split('&'))
         user_data = json.loads(user_data_dict.get('user', '{}'))
         user_id = user_data.get('id')
-        if not user_id:
-            raise ValueError("User ID not found in validated data")
-
-        # Создаем пользователя в БД, если его там нет
-        get_or_create_user(
-            user_id=user_id,
-            username=user_data.get('username', 'unknown'),
-            first_name=user_data.get('first_name', 'unknown')
-        )
-        
+        if not user_id: raise ValueError("User ID not found")
+        get_or_create_user(user_id=user_id, username=user_data.get('username', ''), first_name=user_data.get('first_name', ''))
         return user_data
     except Exception as e:
-        print(f"Ошибка валидации Telegram initData: {e}")
+        print(f"🔥 Ошибка валидации Telegram initData: {e}")
         raise HTTPException(status_code=403, detail="Could not validate Telegram credentials.")
 
-
-# --- Модели данных ---
-class PhotoSendRequest(BaseModel):
-    imageUrl: str
-
+# --- Модели данных Pydantic ---
+class PhotoSendRequest(BaseModel): imageUrl: str
+class CreateInvoiceRequest(BaseModel): package_id: str
+class TGUser(BaseModel): id: int
+class PreCheckoutQuery(BaseModel): id: str; from_user: TGUser = Field(..., alias="from"); invoice_payload: str
+class SuccessfulPayment(BaseModel): invoice_payload: str
+class TGMessage(BaseModel): chat: TGUser; successful_payment: SuccessfulPayment
+class Update(BaseModel): update_id: int; pre_checkout_query: Optional[PreCheckoutQuery] = None; message: Optional[TGMessage] = None
 
 # --- Вспомогательные функции ---
-def get_random_batyr_image_uri(gender: str = "male") -> str:
-    # Выбираем кэш в зависимости от пола, по умолчанию 'male'
+def get_random_batyr_image_uri(gender: str = "male"):
     cache_key = gender if gender in batyr_images_caches and batyr_images_caches[gender] else "male"
-    
-    image_cache = batyr_images_caches[cache_key]
-    if not image_cache:
-        # Если для выбранного пола нет картинок, пробуем другой
-        fallback_key = "female" if cache_key == "male" else "male"
-        image_cache = batyr_images_caches.get(fallback_key, [])
-        if not image_cache:
-            raise ValueError("Кэш изображений батыров пуст для обоих полов.")
-    
+    image_cache = batyr_images_caches.get(cache_key) or batyr_images_caches.get("male", [])
+    if not image_cache: raise ValueError("Кэш изображений пуст.")
     return random.choice(image_cache)['data_uri']
 
 def update_job_status(job_id: str, status_data: dict):
     try:
         redis_client.set(job_id, json.dumps(status_data), ex=3600)
-        print(f"📝 [Job: {job_id}] Статус обновлен: {status_data.get('status', 'N/A')}")
     except Exception as e:
         print(f"❌ [Job: {job_id}] Ошибка обновления статуса в Redis: {e}")
 
@@ -195,20 +179,14 @@ def resize_image_to_base64(image_bytes: bytes, max_size: int = 1024) -> str:
         encoded_string = base64.b64encode(buffer.getvalue()).decode('utf-8')
         return f"data:image/jpeg;base64,{encoded_string}"
     except Exception as e:
-        print(f"🔥 Ошибка при уменьшении изображения: {e}")
-        raise ValueError("Не удалось обработать изображение.") from e
+        raise ValueError(f"Не удалось обработать изображение: {e}")
 
 async def send_telegram_message(user_id: int, text: str):
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        print("⚠️ TELEGRAM_BOT_TOKEN не найден, сообщение не отправлено.")
-        return
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = { "chat_id": user_id, "text": text, "parse_mode": "HTML" }
     try:
         async with httpx.AsyncClient() as client:
             await client.post(url, json=payload)
-        print(f"✉️ Сообщение отправлено пользователю {user_id}")
     except Exception as e:
         print(f"🔥 Не удалось отправить сообщение пользователю {user_id}: {e}")
 
@@ -256,7 +234,7 @@ def run_face_swap_in_background(job_id: str, user_photo_bytes: bytes, user_id: i
         traceback.print_exc()
         update_job_status(job_id, {"status": "failed", "error": error_msg})
 
-# --- Главные эндпоинты с новой безопасной логикой ---
+# --- ЭНДПОИНТ ГЕНЕРАЦИИ С ПРОВЕРКОЙ КРЕДИТОВ ---
 @app.post("/api/start-face-swap", status_code=status.HTTP_202_ACCEPTED)
 async def start_face_swap_task(
     background_tasks: BackgroundTasks,
@@ -265,25 +243,79 @@ async def start_face_swap_task(
     validated_user: dict = Depends(get_validated_telegram_data)
 ):
     user_id = validated_user.get('id')
-    if not user_id:
-        raise HTTPException(status_code=403, detail="Invalid user data from Telegram.")
-
-    can_generate, message, remaining_attempts = can_user_generate(user_id=user_id)
-    if not can_generate:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=message)
+    can_gen, message, remaining_attempts = can_user_generate(user_id=user_id)
+    if not can_gen:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=message)
 
     job_id = str(uuid.uuid4())
     if not user_photo.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Недопустимый тип файла.")
-    
+
     user_photo_bytes = await user_photo.read()
-    update_job_status(job_id, {"status": "accepted", "job_id": job_id, "message": "⏳ Генерация изображения..."})
+    update_job_status(job_id, {"status": "accepted", "job_id": job_id, "message": "⏳ Принято в очередь..."})
     background_tasks.add_task(run_face_swap_in_background, job_id, user_photo_bytes, user_id, gender)
-    
-    print(f"👍 [Job: {job_id}] Задача принята для пользователя {user_id} ({validated_user.get('first_name', '')}, пол: {gender}).")
-    return { "job_id": job_id, "status": "accepted", "message": "Задача принята в обработку.", "remaining_attempts": remaining_attempts }
 
+    print(f"👍 [Job: {job_id}] Задача принята для {user_id}. Осталось кредитов: {remaining_attempts}.")
+    return {"job_id": job_id, "status": "accepted", "message": "Задача принята в обработку.", "remaining_attempts": remaining_attempts}
 
+# --- ЭНДПОИНТ ДЛЯ СОЗДАНИЯ СЧЕТА ---
+@app.post("/api/create-invoice", dependencies=[Depends(get_validated_telegram_data)])
+async def create_invoice(request: CreateInvoiceRequest):
+    package_id = request.package_id
+    if package_id not in PRICES:
+        raise HTTPException(status_code=404, detail="Выбранный пакет не найден.")
+    package = PRICES[package_id]
+    payload = {"title": package["title"], "description": f"Пополнение баланса на {package['credits']} генераций.", "payload": package_id, "provider_token": PAYMENT_PROVIDER_TOKEN, "currency": "KZT", "prices": [{"label": package["title"], "amount": package["price_amount"]}], "start_parameter": "batyrai-payment"}
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(f"https://api.telegram.org/bot{BOT_TOKEN}/createInvoiceLink", json=payload)
+            response.raise_for_status()
+            result = response.json()
+            if result.get("ok"):
+                return {"invoice_link": result["result"]}
+            else:
+                raise HTTPException(status_code=500, detail=f"Ошибка API Telegram: {result.get('description')}")
+    except httpx.HTTPStatusError as e:
+        print(f"🔥 Ошибка создания счета: {e.response.text}")
+        raise HTTPException(status_code=500, detail="Не удалось создать счет на оплату.")
+
+# --- ЭНДПОИНТ ДЛЯ ВЕБХУКОВ ОТ TELEGRAM ---
+@app.post("/api/telegram-webhook")
+async def telegram_webhook(request: Request, x_telegram_bot_api_secret_token: str = Header(None)):
+    if x_telegram_bot_api_secret_token != WEBHOOK_SECRET_TOKEN:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+    try:
+        data = await request.json()
+        update = Update.model_validate(data)
+    except Exception:
+        return JSONResponse(status_code=400, content={"ok": False, "error": "Invalid data"})
+
+    if update.pre_checkout_query:
+        query = update.pre_checkout_query
+        ok = query.invoice_payload in PRICES
+        error_message = None if ok else "Товар больше не доступен."
+        async with httpx.AsyncClient() as client:
+            await client.post(f"https://api.telegram.org/bot{BOT_TOKEN}/answerPreCheckoutQuery", json={"pre_checkout_query_id": query.id, "ok": ok, "error_message": error_message})
+        print(f"✅ PreCheckout для {query.from_user.id} {'подтвержден' if ok else 'отклонен'}.")
+        return JSONResponse({"ok": True})
+
+    if update.message and update.message.successful_payment:
+        payment = update.message.successful_payment
+        user_id = update.message.chat.id
+        package_id = payment.invoice_payload
+        if package_id in PRICES:
+            credits_to_add = PRICES[package_id]["credits"]
+            new_balance = add_credits_to_user(user_id=user_id, amount=credits_to_add)
+            success_text = (f"<b>Оплата прошла успешно!</b> ✨\n\n"
+                            f"Вам начислено: <b>{credits_to_add} генераций</b>.\n"
+                            f"Ваш новый баланс: <b>{new_balance} генераций</b>.\n\n"
+                            f"Возвращайтесь в приложение и продолжайте творить!")
+            await send_telegram_message(user_id, success_text)
+        return JSONResponse({"ok": True})
+
+    return JSONResponse({"ok": True})
+
+# --- ОСТАЛЬНЫЕ ЭНДПОИНТЫ ---
 @app.get("/api/task-status/{job_id}", dependencies=[Depends(get_validated_telegram_data)])
 async def get_task_status(job_id: str):
     task_data_str = redis_client.get(job_id)
@@ -291,47 +323,30 @@ async def get_task_status(job_id: str):
         raise HTTPException(status_code=404, detail="Задача не найдена.")
     return json.loads(task_data_str)
 
-
-@app.post("/api/send-photo-to-chat")
-async def send_photo_to_chat(
-    request: PhotoSendRequest,
-    validated_user: dict = Depends(get_validated_telegram_data)
-):
+@app.post("/api/send-photo-to-chat", dependencies=[Depends(get_validated_telegram_data)])
+async def send_photo_to_chat(request: PhotoSendRequest, validated_user: dict = Depends(get_validated_telegram_data)):
     user_id = validated_user.get('id')
-    if not user_id:
-        raise HTTPException(status_code=403, detail="Invalid user data.")
-
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        raise HTTPException(status_code=500, detail="Токен бота не настроен на сервере.")
-    
-    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
     payload = { "chat_id": user_id, "photo": request.imageUrl, "caption": "Ваш портрет Батыра готов! ✨\n\nСоздано в @BatyrAI_bot" }
-    
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, timeout=30.0)
             response.raise_for_status()
         return {"status": "ok", "message": "Фото успешно отправлено в ваш чат."}
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Произошла внутренняя ошибка сервера.")
-
+        raise HTTPException(status_code=500, detail=f"Не удалось отправить фото: {e}")
 
 @app.get("/api/download-image", dependencies=[Depends(get_validated_telegram_data)])
 async def download_image_proxy(url: str):
-    if not url:
-        raise HTTPException(status_code=400, detail="URL не указан.")
+    if not url: raise HTTPException(status_code=400, detail="URL не указан.")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(url, follow_redirects=True, timeout=30.0)
             response.raise_for_status()
-            content_type = response.headers.get('content-type', 'application/octet-stream')
-            return StreamingResponse(response.iter_bytes(), media_type=content_type)
+            return StreamingResponse(response.iter_bytes(), media_type=response.headers.get('content-type'))
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Произошла внутренняя ошибка при скачивании файла.")
+        raise HTTPException(status_code=500, detail=f"Ошибка при скачивании файла: {e}")
 
-
-# --- Открытые эндпоинты для мониторинга ---
 @app.get("/api/stats")
 async def get_app_stats():
     total_users = get_total_users_count()
@@ -343,12 +358,30 @@ async def health_check():
     try:
         if redis_client and redis_client.ping():
             redis_status = "connected"
-    except Exception:
-        pass
-    return { 
-        "status": "healthy" if redis_status == "connected" else "unhealthy", 
-        "redis": redis_status, 
-        "male_images_cached": len(batyr_images_caches.get("male", [])),
-        "female_images_cached": len(batyr_images_caches.get("female", [])),
-        "timestamp": datetime.now().isoformat() 
-    }
+    except Exception: pass
+    return {"status": "healthy", "redis": redis_status, "male_images_cached": len(batyr_images_caches.get("male", [])), "female_images_cached": len(batyr_images_caches.get("female", [])), "timestamp": datetime.now().isoformat()}
+
+
+@app.get("/api/user/status", dependencies=[Depends(get_validated_telegram_data)])
+async def get_user_status(validated_user: dict = Depends(get_validated_telegram_data)):
+    user_id = validated_user.get('id')
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT generation_credits FROM users WHERE user_id = ?", (user_id,))
+        user_data = cursor.fetchone()
+        
+        if user_data:
+            return {"credits": user_data['generation_credits']}
+        else:
+            # Такого быть не должно, т.к. get_validated_telegram_data создает пользователя, но на всякий случай
+            return {"credits": 0}
+            
+    except Exception as e:
+        print(f"🔥 Ошибка получения статуса пользователя {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Не удалось получить данные пользователя.")
+    finally:
+        if conn:
+            conn.close()
