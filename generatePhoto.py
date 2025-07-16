@@ -1,4 +1,4 @@
-# Полное содержимое файла main.py
+# Полностью замените содержимое файла main.py
 
 import os
 import httpx
@@ -24,11 +24,8 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import redis
-from database import get_db_connection
-
-from pydantic import BaseModel, Field
 # Импортируем обновленные функции из database.py
-from database import init_db, get_or_create_user, can_user_generate, add_credits_to_user, get_total_users_count
+from database import init_db, get_or_create_user, can_user_generate, add_credits_to_user, get_total_users_count, get_user_status_data
 
 load_dotenv()
 
@@ -48,7 +45,6 @@ WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL")
 WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
-# Проверка наличия всех ключевых переменных
 if not all([PIAPI_KEY, BOT_TOKEN, PAYMENT_PROVIDER_TOKEN, WEBHOOK_BASE_URL, WEBHOOK_SECRET_TOKEN]):
     raise RuntimeError("Одна или несколько критически важных переменных окружения отсутствуют! Проверьте .env файл.")
 
@@ -364,24 +360,17 @@ async def health_check():
 
 @app.get("/api/user/status", dependencies=[Depends(get_validated_telegram_data)])
 async def get_user_status(validated_user: dict = Depends(get_validated_telegram_data)):
+    """
+    Возвращает полный статус пользователя:
+    - `credits`: Количество платных генераций фото.
+    - `assistant_remaining_uses`: Сколько бесплатных запросов к ассистенту осталось на сегодня.
+    - `assistant_limit`: Общий дневной лимит запросов к ассистенту.
+    """
     user_id = validated_user.get('id')
-    
-    conn = None
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT generation_credits FROM users WHERE user_id = ?", (user_id,))
-        user_data = cursor.fetchone()
-        
-        if user_data:
-            return {"credits": user_data['generation_credits']}
-        else:
-            # Такого быть не должно, т.к. get_validated_telegram_data создает пользователя, но на всякий случай
-            return {"credits": 0}
-            
+        # Используем новую функцию, которая возвращает все необходимые данные
+        status_data = get_user_status_data(user_id)
+        return status_data
     except Exception as e:
         print(f"🔥 Ошибка получения статуса пользователя {user_id}: {e}")
         raise HTTPException(status_code=500, detail="Не удалось получить данные пользователя.")
-    finally:
-        if conn:
-            conn.close()
