@@ -12,7 +12,7 @@ services:
       - ./batyr-images:/app/batyr-images
       - ./storage:/app/storage
     env_file:
-      - ./.env # Рекомендуется использовать явный путь
+      - ./.env
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -29,7 +29,7 @@ services:
       dockerfile: assistant.Dockerfile
     container_name: batyr-assistant
     env_file:
-      - ./.env # Рекомендуется использовать явный путь
+      - ./.env
     networks:
       - batyr-net
     restart: always
@@ -41,7 +41,12 @@ services:
       dockerfile: bot.Dockerfile
     container_name: telegram-bot
     env_file:
-      - ./.env # Рекомендуется использовать явный путь
+      - ./.env
+    # ✅ --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    # Добавляем эту секцию, чтобы отключить буферизацию вывода в Python
+    environment:
+      - PYTHONUNBUFFERED=1
+    # ✅ --- КОНЕЦ ИЗМЕНЕНИЙ ---
     networks:
       - batyr-net
     restart: always
@@ -52,12 +57,8 @@ services:
       context: ./map-service
       dockerfile: map.Dockerfile
     container_name: batyr-map-data
-    
-    # ✅ ИСПРАВЛЕНИЕ: Указываем явный путь к файлу .env в корне проекта.
-    # Это решает проблему, когда Docker Compose не может найти файл.
     env_file:
       - ./.env 
-      
     networks:
       - batyr-net
     restart: always
