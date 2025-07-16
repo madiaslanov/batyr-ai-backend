@@ -1,0 +1,727 @@
+{
+    "KZ10": {
+      "region_name": "Abai Region",
+      "main_text": "Abai Region is the heart of East Kazakhstan, the golden cradle of Kazakh culture and spirituality. This land gave birth to great national figures, batyr defenders, and was the site of historic events.",
+      "batyrs": [
+        {
+          "name": "Karakerey Kabanbay Batyr",
+          "years": "1692–1770",
+          "description": "A hero of the Kazakh-Dzungar wars, one of the country's defenders. Born near Shyngystau, in the territory of the modern Abai Region.",
+          "image": "https://upload.wikimedia.org/wikipedia/kk/0/0b/%D2%9A%D0%B0%D1%80%D0%B0%D0%BA%D0%B5%D1%80%D0%B5%D0%B9_%D2%9A%D0%B0%D0%B1%D0%B0%D0%BD%D0%B1%D0%B0%D0%B9.jpg"
+        },
+        {
+          "name": "Espenbet Batyr",
+          "years": "18th century",
+          "description": "A batyr from the Karakerey clan, a contemporary and close companion of Kabanbay. He showed heroism in the fight against the Dzungar invasion.",
+          "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR3xg3hb_-WCpi_ACzKNVH1q8UDVHB9qB1eAg&s"
+        },
+        {
+          "name": "Descendants of Bogenbay Batyr",
+          "years": "18th–19th centuries",
+          "description": "In this region, the direct descendants of Bogenbay Batyr were also active in defending the country.",
+          "image": "https://sarbaz.kz/cache/imagine/1200/uploads/news/2023/12/07/657147e7c71e6358366549.png"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Shyngystau Campaign",
+          "period": "18th century",
+          "description": "Kazakh detachments led by Kabanbay Batyr fought major battles against the Dzungars in the Shyngystau region, defending the country's borders."
+        },
+        {
+          "name": "Cultural Rise during the Era of Abai",
+          "period": "Late 19th century",
+          "description": "The educational activities of Abai Kunanbaiuly elevated the spiritual and cultural level of the region to a new stage."
+        }
+      ]
+    },
+    "KZ11": {
+      "region_name": "Akmola Region",
+      "main_text": "Akmola Region is the heart of Saryarka, the homeland of many batyrs who fought for national freedom. This region has left a deep mark on the country's history.",
+      "batyrs": [
+        {
+          "name": "Bogenbay Batyr",
+          "years": "1680–1775",
+          "description": "A famous commander of the Middle Zhuz, a loyal ally of Ablai Khan. He heroically fought against enemies in battles on the territory of the Akmola Region.",
+          "image": "https://sarbaz.kz/cache/imagine/1200/uploads/news/2023/12/07/657147e7c71e6358366549.png"
+        },
+        {
+          "name": "Sagyndyk Batyr",
+          "years": "18th century",
+          "description": "A well-known batyr of the Argyn clan, who distinguished himself in the fight against the Dzungar invasion. He showed heroism in the battles near Akmola.",
+          "image": "https://mysty-onir.kz/wp-content/uploads/sagyndyk-batyr.jpg"
+        },
+        {
+          "name": "Nauan Hazret (Nauryzbay Talasuly)",
+          "years": "1843–1916",
+          "description": "A figure who spiritually inspired the people and called for justice and unity. The people recognized him not only as a batyr but also as a religious leader.",
+          "image": "https://e-history.kz/media/upload/4624/2015/08/20/cc5ff0b93c0a90f99aa05f158a4145a2.jpg"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "The Story of Kalkaman and Mamyr",
+          "period": "18th century",
+          "description": "This event, which took place on the land of Saryarka, became a symbol of heroism and love, holding a special place in the region's folklore."
+        },
+        {
+          "name": "Campaigns of Ablai Khan near Akmola",
+          "period": "18th century",
+          "description": "In important battles with the Dzungars near Akmola, the Kazakh army led by Bogenbay Batyr won a major victory."
+        }
+      ]
+    },
+    "KZ15": {
+      "region_name": "Aktobe Region",
+      "main_text": "Aktobe Region is the homeland of the great steppe batyrs. Famous figures who fought for the country's independence and integrity were born in this region and left an indelible mark on the nation's history.",
+      "batyrs": [
+        {
+          "name": "Eset Kotibaruly",
+          "years": "1803–1889",
+          "description": "A famous batyr of the Junior Zhuz who fought against Russian colonization. In the 1850s–1860s, he led an uprising in the Aral Sea region. He is highly respected in the Aktobe region.",
+          "image": "https://moldir-bulak.kz/wp-content/uploads/786f8135c3a2fe21078b56b66f8e0862-711x1024.jpg"
+        },
+        {
+          "name": "Baktybay Batyr",
+          "years": "18th century",
+          "description": "Participated in battles with the Dzungars during the time of Abulkhair Khan. A brave batyr from the Tabyn clan of the Junior Zhuz.",
+          "image": "https://abai.kz/upload/orig/post/72525_1478575740.jpg"
+        },
+        {
+          "name": "Asau Batyr",
+          "years": "18th–19th centuries",
+          "description": "Participated in uprisings and showed heroism in defending his land from enemies. One of the batyrs whose name became a legend in the people's memory.",
+          "image": "https://sun9-64.userapi.com/impg/jfJLnDb5Um_2V0IY0GEle2tzbyD6dSakWRwVNw/QM7mpxu13eE.jpg?size=350x500&quality=96&sign=bc3f4a5d7056069964bad19f0ddc7066&type=album"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Uprising of Eset Batyr",
+          "period": "1850s–1860s",
+          "description": "A major uprising directed against the colonial policy of the Russian Empire. The Aktobe region was one of the centers of the uprising."
+        },
+        {
+          "name": "Abulkhair Khan's Call for Kazakh Unity",
+          "period": "18th century",
+          "description": "On the Aktobe land, Abulkhair Khan united the clans of the Junior Zhuz and mobilized forces to resist the Dzungars."
+        }
+      ]
+    },
+    "KZ19": {
+      "region_name": "Almaty Region",
+      "main_text": "Almaty Region is the golden cradle of Zhetysu, a land with a history full of heroism and valor. Batyrs who defended the country and figures who fought for national independence were born in this region.",
+      "batyrs": [
+        {
+          "name": "Nauryzbay Batyr",
+          "years": "1706–1781",
+          "description": "A loyal warrior of Ablai Khan, who particularly distinguished himself in the fight against the Dzungar invasion. Born in Zhetysu, in the territory of the modern Almaty Region.",
+          "image": "https://iie.kz/wp-content/uploads/2023/04/image-70.png"
+        },
+        {
+          "name": "Sauryk Batyr",
+          "years": "18th century",
+          "description": "A famous batyr from the Dulat clan of the Senior Zhuz. He showed exceptional heroism in battles with the Dzungars in Zhetysu.",
+          "image": "https://sun9-27.userapi.com/impg/c623422/v623422216/53bac/Nh-WwgcMN30.jpg?size=210x280&quality=96&sign=043ab183be9df9437c57ff8916de049c&type=album"
+        },
+        {
+          "name": "Sypatay Batyr",
+          "years": "1810–1867",
+          "description": "A batyr who fought against the Kokand Khanate and tsarist colonialism, defending the freedom of the Zhetysu people.",
+          "image": "https://lh6.googleusercontent.com/proxy/oL38pT8mKj6pIqN3UtkORehA5ZPrWIg4Hc5jreSq2sUAYWaQSiiVr77GsLEhJ8sXnc3B6Ly5ZwBoQftCcNyC"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Wars against the Dzungars in the Zhetysu region",
+          "period": "18th century",
+          "description": "Detachments led by Nauryzbay and Sauryk batyrs fought decisive battles against the Dzungars in the territory of Zhetysu."
+        },
+        {
+          "name": "Uprisings against Kokand oppression",
+          "period": "Mid-19th century",
+          "description": "The people of Zhetysu, led by batyrs Sypatay, Rustem, and Baiseit, rose up against the Kokand Khanate. These uprisings later grew into a movement against Russian colonizers."
+        }
+      ]
+    },
+    "KZ23": {
+      "region_name": "Atyrau Region",
+      "main_text": "Atyrau Region is a sacred land on the Caspian Sea coast, where batyrs and orator-biys were born. This region is known for figures who selflessly fought to defend their country and land.",
+      "batyrs": [
+        {
+          "name": "Isatay Taimanuly",
+          "years": "1791–1838",
+          "description": "A national batyr who, together with Makhambet, organized an uprising against the tyranny of khans and sultans in the Bukey Horde. Born in the Atyrau region.",
+          "image": "https://upload.wikimedia.org/wikipedia/kk/9/98/%D0%98%D1%81%D0%B0%D1%82%D0%B0%D0%B9.jpg"
+        },
+        {
+          "name": "Makhambet Utemisuly",
+          "years": "1804–1846",
+          "description": "A poet, commander, and batyr. Together with Isatay, he fought against the tsarist government and Khan Zhangir. His heroism and poetry are forever preserved in the people's memory.",
+          "image": "https://malim.kz/images/article-img/1600/23382-1721386037-m.jpg"
+        },
+        {
+          "name": "Barak Batyr",
+          "years": "18th century",
+          "description": "A well-known batyr from the Baibakty clan of the Junior Zhuz. He participated in battles against the Dzungar invasion and distinguished himself in defending the country.",
+          "image": "https://sun9-5.userapi.com/s/v1/ig2/BVBFKdWDHLwZv5IbtnNDdorTxuCJYSsk_Zlf3lj_zeNTuS8rxwV_HKokaRlFitzQl8BVktw48Fy_BOZ91k5GCOew.jpg?quality=96&as=32x41,48x61,72x92,108x138,160x204,240x306,360x459,480x612,540x689,640x817,720x919,1000x1276&from=bu&cs=640x0"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Uprising of Isatay and Makhambet",
+          "period": "1836–1838",
+          "description": "A popular uprising against the tyranny of Khan Zhangir and the tsarist government. This event unfolded widely in the Atyrau and West Kazakhstan regions."
+        },
+        {
+          "name": "The Junior Zhuz's struggle against the Dzungars",
+          "period": "18th century",
+          "description": "The clans of the Atyrau region actively fought against the Dzungar invasion and played a crucial role in defending the western borders."
+        }
+      ]
+    },
+    "KZ27": {
+      "region_name": "Oral (West Kazakhstan Region)",
+      "main_text": "Oral is the cradle of heroism and valor on the banks of the Ural River. Batyrs who defended their country from enemies and historical figures who fought for justice were born in this region.",
+      "batyrs": [
+        {
+          "name": "Syrym Datuly",
+          "years": "1753–1802",
+          "description": "A famous batyr, orator, and leader of the Junior Zhuz. He led the uprising against the colonial policy of the Russian Empire in 1783–1797.",
+          "image": "https://cdn.nur.kz/images/1120/d34898a80678a601.jpeg"
+        },
+        {
+          "name": "Tilenshi Batyr",
+          "years": "18th century",
+          "description": "A batyr of the Junior Zhuz clans, famous for his heroism in battles against the Dzungars. A historical figure who promoted the unity of the people.",
+          "image": "https://e-history.kz/storage/tmp/resize/preview/1200_0_3dc3dc32ac9e4579a4059889754122e2.jpg"
+        },
+        {
+          "name": "Zhanbori Batyr — companion of Aishuak Khan",
+          "years": "18th–19th centuries",
+          "description": "A brave batyr who defended the Ural region from external threats during the reign of Khan Aishuak.",
+          "image": "https://lh4.googleusercontent.com/proxy/NmLFM8TShhp-CzyrFg_vaRVAURWI3A4xELy87baWCRWTYeOeGDCISg37RJhpZ3_d8snW24AoqTRUl0uCJzmS7l1UaQ"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "National liberation uprising led by Syrym Datuly",
+          "period": "1783–1797",
+          "description": "A popular movement against the tyranny of the tsarist government. Under the leadership of Syrym Datuly, the people of the Western region fought against colonialism."
+        },
+        {
+          "name": "Land disputes of the Ural Kazakhs",
+          "period": "18th century",
+          "description": "Movements of the Junior Zhuz clans against the land seizures by the tsarist government became widespread in the territory of West Kazakhstan."
+        }
+      ]
+    },
+    "KZ31": {
+      "region_name": "Jambyl Region",
+      "main_text": "Jambyl Region is an abode of heroism and spirituality on the land of ancient Taraz. Batyrs who defended their country and events that decided the fate of the people took place in this region.",
+      "batyrs": [
+        {
+          "name": "Boltirik Shezhen-Batyr",
+          "years": "1771–1860",
+          "description": "A figure who fought against the oppression of the Kokand Khanate, wielding both the word and the spear for the unity and justice of the people. Lived near Shu and Merke.",
+          "image": "https://upload.wikimedia.org/wikipedia/kk/b/ba/Boltirik.jpg"
+        },
+        {
+          "name": "Kotenshi Batyr",
+          "years": "18th century",
+          "description": "A batyr from the Dulat clan of the Senior Zhuz. He showed exceptional heroism in the fight against Kokand invaders in the Talas region.",
+          "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQdDtuHBzTahXn1xqmd9RsjfLLmUpTG9Wdo1Q&s"
+        },
+        {
+          "name": "Sypatay Batyr",
+          "years": "1810–1867",
+          "description": "A major commander who opposed Kokand and tsarist rule in the Zhetysu and Jambyl regions. Remembered by the people for his heroism and justice.",
+          "image": "https://abai.kz/upload/images/bf5344d19cf0b41d7951a2fc735be4d8.jpg"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Uprisings in Zhetysu and Talas against Kokand oppression",
+          "period": "19th century",
+          "description": "Several popular movements against the tax and violence policies of the Kokand Khanate occurred in the Shu, Merke, and Talas regions. These uprisings, led by batyrs, showed the Jambyl people's desire for freedom."
+        },
+        {
+          "name": "Taraz — a center of Turkic civilization",
+          "period": "6th–12th centuries",
+          "description": "Ancient Taraz was one of the most important cities on the Silk Road in the Middle Ages. This city forms the historical and cultural basis of the Jambyl region."
+        }
+      ]
+    },
+    "KZ33": {
+      "region_name": "Jetisu Region",
+      "main_text": "Jetisu Region, traditionally inhabited by the Naiman, Zhalaiyr, and Dulat clans, played a special role in the fight against the Dzungar invasion. This land is the abode of batyrs and biys, of statehood and heroism.",
+      "batyrs": [
+        {
+          "name": "Karakerey Kabanbay Batyr",
+          "years": "1692–1770",
+          "description": "Hailing from the Karakerey clan of the Naiman tribe, a celebrated hero of the Kazakh-Dzungar wars. Born in Shyngystau, he also participated in battles in the land of Zhetysu.",
+          "image": "https://upload.wikimedia.org/wikipedia/kk/0/0b/%D2%9A%D0%B0%D1%80%D0%B0%D0%BA%D0%B5%D1%80%D0%B5%D0%B9_%D2%9A%D0%B0%D0%B1%D0%B0%D0%BD%D0%B1%D0%B0%D0%B9.jpg"
+        },
+        {
+          "name": "Zhalaiyr Kasym Batyr",
+          "years": "18th century",
+          "description": "A brave batyr from the Zhalaiyr clan in Zhetysu, who became famous in the fight against Dzungar invaders.",
+          "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS8YQdpQPYhEBLKvVY3PDSRehJyAu_hk-sIHg&s"
+        },
+        {
+          "name": "Sypatay Batyr",
+          "years": "1810–1867",
+          "description": "A famous batyr from the Dulat tribe. A prominent commander of the Zhetysu uprisings against Kokand and tsarist colonialism.",
+          "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT2rzxO3VIOZGHpBb-upR0aZYcnM5s9u-Vl5A&s"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Battle of Orbulak",
+          "period": "1643",
+          "description": "A united army led by Karasai, Zhangir, and the Samarkand Khan Zhalantos achieved a major victory against the Dzungars in the land of Zhetysu."
+        },
+        {
+          "name": "Zhetysu uprisings against Kokand oppression",
+          "period": "19th century",
+          "description": "Popular movements led by Sypatay, Baiseit, and other batyrs were directed against the tax and violence policies of the Kokand Khanate."
+        },
+        {
+          "name": "Unification of Zhalaiyr and Naiman clans and their participation in battles",
+          "period": "18th century",
+          "description": "In the Zhetysu region, the Naiman and Zhalaiyr clans jointly fought against the Dzungars, showing an example of Kazakh unity."
+        }
+      ]
+    },
+    "KZ35": {
+      "region_name": "Karagandy Region",
+      "main_text": "Karagandy Region, located in the heart of Saryarka, is the homeland of batyrs and historical events that greatly influenced the nation's destiny. Figures who defended their country, fought for justice, and showed heroism lived in this region.",
+      "batyrs": [
+        {
+          "name": "Bogenbay Batyr",
+          "years": "1680–1775",
+          "description": "Hailing from the Kanzhygaly clan of the Middle Zhuz, a loyal commander of Ablai Khan. He participated in several major battles against the Dzungar invasion in the Karagandy region.",
+          "image": "https://sarbaz.kz/cache/imagine/1200/uploads/news/2023/12/07/657147e7c71e6358366549.png"
+        },
+        {
+          "name": "Shon Bi",
+          "years": "18th century",
+          "description": "An influential biy and batyr figure from the Argyn clan. A leader who maintained the unity of the clans around Karagandy and justly resolved internal disputes.",
+          "image": "https://anatili.kazgazeta.kz/wp-content/uploads/Shon_bi.jpg"
+        },
+        {
+          "name": "Niyaz Batyr",
+          "years": "1800–1850",
+          "description": "A figure who defended the country and land in the Saryarka steppes, known for his justice and resilience. He holds a special place in the legends spread among the Argyns.",
+          "image": "https://massaget.kz/userdata/news/news_40010/image_l.jpg"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Battles in Saryarka against the Dzungars",
+          "period": "18th century",
+          "description": "Batyrs like Bogenbay and Kabanbay fought important battles in the territory of Saryarka, defending the lands of the Middle Zhuz from the Dzungar invasion."
+        },
+        {
+          "name": "Uprisings in the Karkaraly uezd",
+          "period": "19th century",
+          "description": "Several local uprisings against the tax and land policies of the tsarist government took place in the Karkaraly region. These uprisings became the basis for national liberation movements."
+        }
+      ]
+    },
+    "KZ39": {
+      "region_name": "Kostanay Region",
+      "main_text": "Kostanay Region is a region full of historical events and heroism in the Torgay steppe. Here, batyrs fought for freedom, and uprisings that decided the fate of the people took place.",
+      "batyrs": [
+        {
+          "name": "Keiki Batyr (Nurmagambet Kokembaiuly)",
+          "years": "1871–1923",
+          "description": "A famous sniper from the Argyn tribe, a companion of Amangeldy's warriors, and a participant in the 1916 national liberation uprising. He showed exceptional heroism in the fight against Soviet rule.",
+          "image": "https://e-history.kz/media/upload/ckimages/%D0%BA%D0%B5%D0%B9%D0%BA%D0%B83.jpg"
+        },
+        {
+          "name": "Amangeldy Imanov",
+          "years": "1873–1919",
+          "description": "The leader of the national liberation movement in the Kostanay region. He organized the Torgay uprising of 1916 and defended the interests of the Kazakh people.",
+          "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSY68lL0qTffAF43FHkQHPmSUlZWarY84hCNg&s"
+        },
+        {
+          "name": "Basykara Batyr",
+          "years": "18th century",
+          "description": "A batyr from the Argyn clan who participated in battles against the Dzungars near Torgay and Kostanay.",
+          "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqvvwunCPFKVLniMFFgymx3oc-fCcb5PCnLg&s"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "The 1916 National Liberation Uprising in Torgay",
+          "period": "1916",
+          "description": "The uprising led by Amangeldy Imanov and Keiki Batyr was directed against the tsarist decree (on recruiting men for rear-echelon work). It covered the Kostanay and Torgay steppes."
+        },
+        {
+          "name": "Battles against the Dzungars near Kostanay",
+          "period": "18th century",
+          "description": "Basykara Batyr and other warriors played a decisive role in defending the Torgay steppe from the Dzungar invasion."
+        }
+      ]
+    },
+    "KZ43": {
+      "region_name": "Kyzylorda Region",
+      "main_text": "Kyzylorda Region is the historical, spiritual, and cultural center of the Syr Darya region. Here, batyrs and biys of the Junior Zhuz fought for the people's freedom and participated in great historical events.",
+      "batyrs": [
+        {
+          "name": "Zhanqozha Nurmuhammeduly",
+          "years": "1774–1860",
+          "description": "One of the batyrs of the Junior Zhuz, a defender of the Syr Darya region. He fought heroically against the Kokand and Khiva Khanates, and later against the colonial policy of the tsarist government.",
+          "image": "https://e-history.kz/storage/tmp/resize/news/1200_0_872e53ef03fc08b5cdbad75ed45a17d3.jpg"
+        },
+        {
+          "name": "Eset Kotibaruly",
+          "years": "1803–1868",
+          "description": "A famous batyr of the Adai clan. He participated in uprisings against the colonization of the Russian Empire and also fought in the Syr Darya region.",
+          "image": "https://moldir-bulak.kz/wp-content/uploads/786f8135c3a2fe21078b56b66f8e0862-711x1024.jpg"
+        },
+        {
+          "name": "Bekmyrza Batyr",
+          "years": "18th century",
+          "description": "Lived in the lower reaches of the Syr Darya. He defended his people from Khivan attacks and was distinguished by his bravery.",
+          "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqvvwunCPFKVLniMFFgymx3oc-fCcb5PCnLg&s"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Uprisings against Kokand and Khiva led by Zhanqozha Batyr",
+          "period": "1820s–1850s",
+          "description": "The struggle to protect the people of the Syr Darya region from the oppression of Kokand and Khiva. Zhanqozha Batyr united the people and defended the Syr Darya region from enemies."
+        },
+        {
+          "name": "Wars against Russian fortresses along the Syr Darya",
+          "period": "19th century",
+          "description": "Resistance directed against the military fortresses of the Russian Empire in the Syr Darya region. These uprisings showed the Kyzylorda people's aspiration for independence."
+        }
+      ]
+    },
+    "KZ47": {
+      "region_name": "Mangystau Region (Aktau)",
+      "main_text": "Mangystau Region is the ancestral home of the Adai clan of the Junior Zhuz, a land of famous batyrs who defended their country and land. This region holds a special place in both the struggle against colonial oppression and in spiritual leadership.",
+      "batyrs": [
+        {
+          "name": "Eset Kotibaruly",
+          "years": "1803–1868",
+          "description": "A famous batyr from the Adai clan. He fought for many years against Russian colonization, battling for the freedom of the Mangystau and Ustyurt regions.",
+          "image": "https://moldir-bulak.kz/wp-content/uploads/786f8135c3a2fe21078b56b66f8e0862-711x1024.jpg"
+        },
+        {
+          "name": "Berdigozha Batyr",
+          "years": "18th century",
+          "description": "A brave batyr who defended the honor of the Adai people from Dzungar and Turkmen invasions. Known in historical legends for his justice and courage.",
+          "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRp6LqmtBJe8C1hPy3rWmNO5mpy7BXBj3lu6g&s"
+        },
+        {
+          "name": "Ospan Batyr of Mangystau",
+          "years": "1820–1870",
+          "description": "The leader of the Mangystau uprising against Russian colonial policy. A resilient figure who fought for the independence of his people.",
+          "image": "https://qamshy.kz/uploads/thumbnail/20170709045641615_big.jpg"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "The Mangystau Uprising of 1870",
+          "period": "1870",
+          "description": "A major popular uprising organized against the military-administrative pressure of the Russian Empire. This movement was a vivid manifestation of the struggle for freedom and justice."
+        },
+        {
+          "name": "Resistance of the Adai clan to joining Russia",
+          "period": "19th century",
+          "description": "The Adai people in the Mangystau region resisted Russian suzerainty for a long time. The people of this region sought to protect their independence and territorial integrity."
+        }
+      ]
+    },
+    "KZ55": {
+      "region_name": "Pavlodar Region",
+      "main_text": "Pavlodar Region is a vast land along the Irtysh River, a sacred place where the heroic paths of Naiman, Kerey, and Argyn batyrs and the fate of the people in the Saryarka steppes converged.",
+      "batyrs": [
+        {
+          "name": "Malaysary Batyr",
+          "years": "18th century",
+          "description": "A commander from the Matay clan of the Naiman tribe, a close companion of Ablai Khan. He particularly distinguished himself in the fight against the Dzungars on the banks of the Irtysh.",
+          "image": "https://lh5.googleusercontent.com/proxy/WajArh6Kaa1VlawY7aaeyqUrzHkjW_oxtGj7QjrfReK30VAzcw0eCMp2dBFyOePpYSiNHtc6Fv26aVjDQmbfNd1djg"
+        },
+        {
+          "name": "Zhasybay Batyr",
+          "years": "18th century",
+          "description": "A brave commander from the Argyn clan. He is remembered by the people for his heroism in defending the Bayanaul and Irtysh regions from the Dzungars.",
+          "image": "https://lh5.googleusercontent.com/proxy/26b8Hwhc1z2y3y7MHYQBZA3cH0ZRPuLi8iYMsnUo-2fCp1hWKiHyvz3Wmnob-TUApc4KmWLuLqiq5G84gjXStE0wXA"
+        },
+        {
+          "name": "Kurkeli Zhandarbek Batyr",
+          "years": "18th century",
+          "description": "A batyr from the Kerey clan, a historical figure who distinguished himself in battles on the banks of the Irtysh and in the Sileti steppe.",
+          "image": "https://qagro.kz/wp-content/uploads/2023/05/806fa5233defe9b4a8b45309bc769681.jpg"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Battles on the banks of the Irtysh against the Dzungar invasion",
+          "period": "18th century",
+          "description": "Batyrs such as Malaysary, Zhasybay, and Zhandarbek, along with Kazakh detachments led by Ablai Khan, liberated the banks of the Irtysh from the enemy."
+        },
+        {
+          "name": "Mounds and historical sites in the Bayanaul region",
+          "period": "18th–19th centuries",
+          "description": "The sacred sites and batyr mausoleums in this region are a testament to the people's spirit and heroism. The monuments at Lake Zhasybay and Mount Malaysary are proof of this."
+        }
+      ]
+    },
+    "KZ59": {
+      "region_name": "North Kazakhstan Region (Petropavl)",
+      "main_text": "North Kazakhstan Region is the ancestral home of the Kerey and Uak tribes, a land of famous batyrs who fought against the Dzungar invasion. Events written in golden letters in the nation's history took place in this region.",
+      "batyrs": [
+        {
+          "name": "Bayan Batyr",
+          "years": "18th century",
+          "description": "A famous batyr from the Kerey clan. He showed exceptional heroism in battles against the Dzungar invasion. Bayantau Mountain in North Kazakhstan is named after him.",
+          "image": "https://e-history.kz/media/upload/4624/2015/08/12/961b2463b9f47a54c182b72255e6bd6c.jpg"
+        },
+        {
+          "name": "Kozhabergen Zhyrau",
+          "years": "1663–1763",
+          "description": "A batyr and zhyrau (bard) from the Uak clan. Author of the 'Elim-ai' dastan, a spiritual leader who called for unity in the fight against the Dzungars.",
+          "image": "https://upload.wikimedia.org/wikipedia/kk/thumb/9/9d/%D2%9A%D0%BE%D0%B6%D0%B0%D0%B1%D0%B5%D1%80%D0%B3%D0%B5%D0%BD_%D0%96%D1%8B%D1%80%D0%B0%D1%83.jpg/250px-%D2%9A%D0%BE%D0%B6%D0%B0%D0%B1%D0%B5%D1%80%D0%B3%D0%B5%D0%BD_%D0%96%D1%8B%D1%80%D0%B0%D1%83.jpg"
+        },
+        {
+          "name": "Segiz Seri",
+          "years": "1818–1854",
+          "description": "A poet, batyr, and composer. A figure who sought to establish justice among the people and spoke out against Russian colonization. He had great influence in the Northern region.",
+          "image": "https://www.zharar.com/uploads/posts/2016-11/1478101071_segiz.jpg"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Northern campaigns against the Dzungars",
+          "period": "18th century",
+          "description": "The Kerey and Uak batyrs showed great heroism in liberating the steppes of North Kazakhstan from the Dzungars. Bayan Batyr and Kozhabergen Zhyrau were at the center of this struggle."
+        },
+        {
+          "name": "Headquarters of Ablai Khan (near Petropavl)",
+          "period": "18th century",
+          "description": "Ablai Khan's permanent headquarters were located in North Kazakhstan. State affairs were decided and key decisions in the fight against the Dzungars were made in this region."
+        }
+      ]
+    },
+    "KZ61": {
+      "region_name": "Turkistan Region",
+      "main_text": "Turkistan Region is the spiritual capital of the Kazakh people, a sacred land where the mausoleums of Tauke Khan and Khoja Ahmed Yasawi are located. Batyrs who defended the country lived and historical decisions were made in this region.",
+      "batyrs": [
+        {
+          "name": "Karasai Batyr",
+          "years": "1598–1671",
+          "description": "A famous commander from the Shaprashty clan of the Senior Zhuz. He showed exceptional heroism in defending the Turkistan region from Dzungar raids.",
+          "image": "https://cdn.nur.kz/images/1200x675/952976e2e38277bd.jpeg?version=1"
+        },
+        {
+          "name": "Tolegetai Batyr",
+          "years": "18th century",
+          "description": "A batyr who fought against Dzungar and Khivan invaders in the Southern region. He defended the frontier between Zhetysu and Turkistan.",
+          "image": "https://tengrinews.kz/userdata/u356/2021-02/resize/6cd2f1373984203f9450fff828a94f75.jpeg"
+        },
+        {
+          "name": "Sypatay Batyr",
+          "years": "1780–1867",
+          "description": "A batyr from the Dulat clan of the Senior Zhuz. He played an active role in the national liberation struggle against the Kokand Khanate.",
+          "image": "https://lh6.googleusercontent.com/proxy/oL38pT8mKj6pIqN3UtkORehA5ZPrWIg4Hc5jreSq2sUAYWaQSiiVr77GsLEhJ8sXnc3B6Ly5ZwBoQftCcNyC"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Struggle against the Kokand Khanate",
+          "period": "19th century",
+          "description": "The Kazakh clans near Turkistan organized several uprisings against Kokand oppression. These events showed the people's aspiration for freedom."
+        },
+        {
+          "name": "The reign of Tauke Khan",
+          "period": "17th–18th centuries",
+          "description": "Turkistan was the residence of Tauke Khan. His code of laws 'Zhety Zhargy' was adopted here, becoming the basis for the country's unity."
+        }
+      ]
+    },
+    "KZ62": {
+      "region_name": "Ulytau Region",
+      "main_text": "Ulytau is a sacred place that was the spiritual and political center of the Kazakh Khanate. Here, khans were raised on a white felt mat, and the fate of the country was decided. Many batyrs showed heroism in defending this region.",
+      "batyrs": [
+        {
+          "name": "Asan Kaigy",
+          "years": "14th–15th centuries",
+          "description": "A wise zhyrau (bard) and visionary batyr. He considered Ulytau the heartland of the Kazakhs, dreamed of national unity, and sought the promised land (Zheruyik).",
+          "image": "https://upload.wikimedia.org/wikipedia/kk/b/b0/Asan_Kaigi_m.jpg"
+        },
+        {
+          "name": "Zholbarys Batyr",
+          "years": "18th century",
+          "description": "Born and raised in Ulytau, a batyr who distinguished himself in the war against the Dzungars. He came from the Argyn tribe and was one of Ablai Khan's trusted commanders.",
+          "image": "https://ognialatau.kz/uploads/news/13839/news13839.jpg"
+        },
+        {
+          "name": "Karakerey Kabanbay",
+          "years": "1692–1770",
+          "description": "A batyr of the Kazakh people, remembered for his exceptional heroism in the fight against the Dzungar invasion. He led troops in Ulytau several times.",
+          "image": "https://upload.wikimedia.org/wikipedia/kk/0/0b/%D2%9A%D0%B0%D1%80%D0%B0%D0%BA%D0%B5%D1%80%D0%B5%D0%B9_%D2%9A%D0%B0%D0%B1%D0%B0%D0%BD%D0%B1%D0%B0%D0%B9.jpg"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Enthronement of khans in Ulytau",
+          "period": "From the 15th century",
+          "description": "Ulytau is the place where khans were raised on a white felt mat, proclaiming them worthy rulers. This tradition symbolizes the unity of the people and the sanctity of the land."
+        },
+        {
+          "name": "Great campaigns against the Dzungars",
+          "period": "17th–18th centuries",
+          "description": "Kazakh troops marched through Ulytau towards Saryarka and Zhetysu. This place had strategic and spiritual significance."
+        }
+      ]
+    },
+    "KZ63": {
+      "region_name": "East Kazakhstan Region (Oskemen)",
+      "main_text": "East Kazakhstan is the ancestral home of the Naiman, Kerey, and Uak tribes, a sacred place where decisive battles in the fight against the Dzungar invasion took place. Many examples of heroism and statehood are preserved in this region.",
+      "batyrs": [
+        {
+          "name": "Kushik Batyr",
+          "years": "18th century",
+          "description": "A famous batyr from the Naiman tribe. He became famous for his exceptional heroism in battles with the Dzungars on the banks of the Irtysh.",
+          "image": "https://lh5.googleusercontent.com/proxy/wv9u0ZkveGm8hxfu_HdqTT3WhG9SXop3sZ6V8ua-u0pGck1Duy9ivwCnCjMxTDuPJkLWSQhmtGZ1EdzCipae"
+        },
+        {
+          "name": "Dauletbay Batyr",
+          "years": "1700–1760",
+          "description": "A batyr from the Kerey tribe. A companion of Ablai Khan, who played an important role in defending the Shyngystau region.",
+          "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQg08reKpoosXbbV5SLwrVcXfgz6bjJNgSAaw&s"
+        },
+        {
+          "name": "Karakerey Kabanbay",
+          "years": "1692–1770",
+          "description": "Kabanbay Batyr is a legendary figure from the Karakerey clan. He participated in many battles in Shyngystau, Tarbagatai, and at the Dzungar Gates.",
+          "image": "https://upload.wikimedia.org/wikipedia/kk/0/0b/%D2%9A%D0%B0%D1%80%D0%B0%D0%BA%D0%B5%D1%80%D0%B5%D0%B9_%D2%9A%D0%B0%D0%B1%D0%B0%D0%BD%D0%B1%D0%B0%D0%B9.jpg"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Campaigns in Shyngystau and Tarbagatai against the Dzungars",
+          "period": "18th century",
+          "description": "In East Kazakhstan, batyrs such as Kabanbay, Dauletbay, and Kushik fought decisive battles against the Dzungars. This region became an important arena that demonstrated the heroism and unity of the Kazakh people."
+        },
+        {
+          "name": "Eastern campaigns of Ablai Khan",
+          "period": "18th century",
+          "description": "Kazakh detachments led by Ablai Khan campaigned against Dzungar fortresses near Tarbagatai and Zaisan, liberating Kazakh lands."
+        }
+      ]
+    },
+    "KZ71": {
+      "region_name": "Astana City",
+      "main_text": "Astana is a region located in the heart of Saryarka, where important events in Kazakh history took place. This land bears the traces of the struggles led by Ablai Khan and Kenesary Khan. Today, as the nation's capital, it has become a symbol of a new era.",
+      "batyrs": [
+        {
+          "name": "Bogenbay Batyr",
+          "years": "1680–1775",
+          "description": "A famous batyr of the Middle Zhuz, one of Ablai Khan's chief commanders. He fought battles against the Dzungars in the Saryarka steppes.",
+          "image": "https://sarbaz.kz/cache/imagine/1200/uploads/news/2023/12/07/657147e7c71e6358366549.png"
+        },
+        {
+          "name": "Bayan Batyr",
+          "years": "18th century",
+          "description": "A brave batyr from the Kerey clan. He participated in battles against the Dzungars in Saryarka and on the banks of the Ishim River.",
+          "image": "https://e-history.kz/media/upload/4624/2015/08/12/961b2463b9f47a54c182b72255e6bd6c.jpg"
+        },
+        {
+          "name": "Kenesary Kasymuly",
+          "years": "1802–1847",
+          "description": "The last khan of the Kazakh Khanate, the leader of the national liberation struggle against Russian colonization. He organized an attack on the Akmola fortress.",
+          "image": "https://e-history.kz/storage/tmp/resize/prominent-figures/1200_0_3179abd07c937096cadf9341660e8b2b.jpg"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Attack of Kenesary Khan on the Akmola fortress",
+          "period": "1838",
+          "description": "Rebels led by Kenesary Kasymuly attacked the Akmola fortress, an important event that intensified the struggle against colonial rule."
+        },
+        {
+          "name": "Campaigns of Ablai Khan in Saryarka",
+          "period": "18th century",
+          "description": "Ablai Khan fought major battles with the Dzungars in the Saryarka steppes and made a great contribution to preserving the country's independence."
+        }
+      ]
+    },
+    "KZ75": {
+      "region_name": "Almaty City",
+      "main_text": "Almaty City is the heart of the Zhetysu region, a sacred place bearing the traces of batyrs who have defended the country since the time of the ancient Saka and Wusun. This region was one of the main centers of the struggle against the Dzungar invasion.",
+      "batyrs": [
+        {
+          "name": "Nauryzbay Batyr",
+          "years": "1706–1781",
+          "description": "The younger brother of Ablai Khan, a famous commander. He led many victorious campaigns against the Dzungars in the Zhetysu and Alatau regions.",
+          "image": "https://iie.kz/wp-content/uploads/2023/04/image-70.png"
+        },
+        {
+          "name": "Raiymbek Batyr",
+          "years": "1705–1785",
+          "description": "Hailing from the Alban tribe of the Senior Zhuz, he particularly distinguished himself in the wars against the Dzungars. He liberated the lands of Kalkaman and Karkara near Almaty.",
+          "image": "https://iie.kz/wp-content/uploads/2023/04/image-68.png"
+        },
+        {
+          "name": "Suranshy Batyr",
+          "years": "1815–1864",
+          "description": "A batyr who fought against Russian and Kokand invasions, sacrificing his life for the freedom of the Zhetysu people.",
+          "image": "https://all-generals.ru/assets/images/polkovodci/SV/Kazahi/Suranshi%20Batir.jpg"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Battles against the Dzungars in the Zhetysu and Alatau regions",
+          "period": "18th century",
+          "description": "Kazakh detachments led by Raiymbek and Nauryzbay batyrs liberated the Zhetysu region from the Dzungar invasion and defended the country's borders."
+        },
+        {
+          "name": "Uprising against Kokand led by Suranshy Batyr",
+          "period": "19th century",
+          "description": "The heroism of Suranshy Batyr in the fight against the tyranny of the Kokand Khanate in Zhetysu inspired the people of Zhetysu."
+        }
+      ]
+    },
+    "KZ79": {
+      "region_name": "Shymkent City",
+      "main_text": "Shymkent City is a home of ancient culture and heroism. In this region, located between Turkistan and Tashkent, the uprising of batyrs against the oppression of the Kokand Khanate holds a special place.",
+      "batyrs": [
+        {
+          "name": "Baizak Batyr",
+          "years": "1791–1864",
+          "description": "A brave figure who led the uprising against the Kokand Khanate and sacrificed his life in the struggle for the people's freedom. The current Baizak district is named in his honor.",
+          "image": "https://e-history.kz/media/upload/1467/2014/07/21/7205731edcef05d66d12597b861814c6.jpg"
+        },
+        {
+          "name": "Sypatay Batyr",
+          "years": "1780–1867",
+          "description": "A Senior Zhuz batyr who participated in the uprising alongside Baizak and fought for the unity and freedom of the people.",
+          "image": "https://abai.kz/upload/images/bf5344d19cf0b41d7951a2fc735be4d8.jpg"
+        },
+        {
+          "name": "Tole Bi",
+          "years": "1663–1756",
+          "description": "Not just a biy who made responsible decisions, but also a wise statesman who could protect the people. Buried near Shymkent.",
+          "image": "https://e-history.kz/storage/tmp/resize/prominent-figures/1200_0_1c8affde26f662edf3c811efe03194e8.jpg"
+        }
+      ],
+      "historical_events": [
+        {
+          "name": "Uprising against Kokand oppression",
+          "period": "19th century",
+          "description": "This uprising, led by Baizak and Sypatay batyrs, showed the aspiration for independence of the people in the Southern region."
+        },
+        {
+          "name": "Shymkent battles",
+          "period": "18th–19th centuries",
+          "description": "Several important battles for the city of Shymkent took place between the Kokand Khanate and Kazakh detachments."
+        }
+      ]
+    }
+  }
