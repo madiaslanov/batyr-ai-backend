@@ -14,6 +14,7 @@ import asyncio
 import hmac
 import hashlib
 from urllib.parse import unquote
+from pydantic import BaseModel, Field
 
 from PIL import Image
 import io
