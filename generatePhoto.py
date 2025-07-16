@@ -14,7 +14,7 @@ import asyncio
 import hmac
 import hashlib
 from urllib.parse import unquote
-from pydantic import BaseModel, Field
+import sqlite3
 
 from PIL import Image
 import io
@@ -25,8 +25,10 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import redis
+from pydantic import BaseModel, Field
+
 # Импортируем обновленные функции из database.py
-from database import init_db, get_or_create_user, can_user_generate, add_credits_to_user, get_total_users_count, get_user_status_data
+from database import init_db, get_or_create_user, can_user_generate, add_credits_to_user, get_total_users_count, get_db_connection
 
 load_dotenv()
 
@@ -362,16 +364,25 @@ async def health_check():
 @app.get("/api/user/status", dependencies=[Depends(get_validated_telegram_data)])
 async def get_user_status(validated_user: dict = Depends(get_validated_telegram_data)):
     """
-    Возвращает полный статус пользователя:
-    - `credits`: Количество платных генераций фото.
-    - `assistant_remaining_uses`: Сколько бесплатных запросов к ассистенту осталось на сегодня.
-    - `assistant_limit`: Общий дневной лимит запросов к ассистенту.
+    Возвращает только кредиты пользователя для генерации фото.
     """
     user_id = validated_user.get('id')
+    conn = None
     try:
-        # Используем новую функцию, которая возвращает все необходимые данные
-        status_data = get_user_status_data(user_id)
-        return status_data
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT generation_credits FROM users WHERE user_id = ?", (user_id,))
+        user_data = cursor.fetchone()
+        
+        if user_data:
+            return {"credits": user_data['generation_credits']}
+        else:
+            # Такого быть не должно, т.к. get_validated_telegram_data создает пользователя
+            return {"credits": 0}
+            
     except Exception as e:
         print(f"🔥 Ошибка получения статуса пользователя {user_id}: {e}")
         raise HTTPException(status_code=500, detail="Не удалось получить данные пользователя.")
+    finally:
+        if conn:
+            conn.close()

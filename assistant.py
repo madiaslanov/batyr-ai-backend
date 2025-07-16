@@ -10,7 +10,7 @@ import hmac
 import hashlib
 from urllib.parse import unquote
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Security, status
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Security
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 import azure.cognitiveservices.speech as speechsdk
@@ -19,16 +19,6 @@ from typing import List, Dict
 from pydub import AudioSegment
 from pydantic import BaseModel, Field
 from openai import BadRequestError
-
-# ✅ Импортируем наши новые функции из общей базы данных
-# Убедись, что файл database.py доступен для импорта
-try:
-    from database import check_and_update_assistant_usage, get_or_create_user
-except ImportError as e:
-    print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось импортировать функции из database.py: {e}")
-    # В реальном приложении здесь лучше завершить работу, так как сервис не сможет работать корректно
-    check_and_update_assistant_usage = None
-    get_or_create_user = None
 
 # --- 1. Настройка логирования ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -67,9 +57,6 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 fastapi_kwargs = {"title": "Batyr AI Assistant API", "description": "Отдельный сервис для голосового AI-ассистента.", "version": "1.0.0"}
 if ENVIRONMENT == "production":
     fastapi_kwargs.update({"docs_url": None, "redoc_url": None, "openapi_url": None})
-    logging.info("Assistant: 'production' mode. API docs disabled.")
-else:
-    logging.info("Assistant: 'development' mode. API docs available.")
 app = FastAPI(**fastapi_kwargs)
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -81,6 +68,7 @@ if not BOT_TOKEN:
 
 telegram_init_data_header = APIKeyHeader(name="X-Telegram-Init-Data", auto_error=False)
 
+# Эта зависимость теперь нужна только для аутентификации
 async def get_validated_telegram_data(init_data: str = Security(telegram_init_data_header)):
     if not init_data:
         raise HTTPException(status_code=401, detail="X-Telegram-Init-Data header is missing")
@@ -98,20 +86,12 @@ async def get_validated_telegram_data(init_data: str = Security(telegram_init_da
         calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         if calculated_hash != hash_from_telegram:
             raise HTTPException(status_code=403, detail="Invalid data signature")
-        
-        user_data_dict = dict(kv.split('=') for kv in unquoted_init_data.split('&'))
-        user_data = json.loads(user_data_dict.get('user', '{}'))
-        user_id = user_data.get('id')
-        if not user_id: raise ValueError("User ID not found")
-        
-        # Убедимся, что пользователь создан в БД (важно для консистентности)
-        if get_or_create_user:
-             get_or_create_user(user_id=user_id, username=user_data.get('username', ''), first_name=user_data.get('first_name', ''))
-
-        return user_data
+        user_data_str = dict(kv.split('=') for kv in unquoted_init_data.split('&')).get('user', '{}')
+        return json.loads(user_data_str)
     except Exception as e:
         logging.warning(f"Ошибка валидации Telegram initData: {e}")
         raise HTTPException(status_code=403, detail="Could not validate Telegram credentials.")
+
 
 # --- 6. Вспомогательные функции ---
 def recognize_speech_from_bytes(audio_bytes: bytes, original_filename: str) -> str:
@@ -154,15 +134,12 @@ def get_answer_from_llm(question: str, history: List[Dict[str, str]]) -> str:
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": question}]
     try:
         response = AZURE_OPENAI_CLIENT.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT_NAME, messages=messages, temperature=0.7, max_tokens=80)
-        
         if not response.choices or not response.choices[0].message.content:
             logging.warning("Ответ от LLM был отфильтрован content filter'ом (пустой choice).")
             return "Кешіріңіз, менің жауабым мазмұн саясатына байланысты бұғатталды. Басқаша сұрап көріңізші."
-
         answer = response.choices[0].message.content
         logging.info(f"Ответ от LLM получен: '{answer[:50]}...'")
         return answer
-
     except BadRequestError as e:
         if e.response and e.response.status_code == 400 and e.body and 'content_filter' in e.body.get('code', ''):
             logging.warning(f"Запрос заблокирован фильтром содержимого Azure: {e.body}")
@@ -170,7 +147,6 @@ def get_answer_from_llm(question: str, history: List[Dict[str, str]]) -> str:
         else:
             logging.error(f"🔥 Ошибка BadRequest при обращении к Azure OpenAI: {e}", exc_info=True)
             raise RuntimeError("Ошибка в запросе к сервису OpenAI.")
-
     except Exception as e:
         logging.error(f"🔥 Непредвиденная ошибка при обращении к Azure OpenAI: {e}", exc_info=True)
         raise RuntimeError("Ошибка при обращении к сервису OpenAI.")
@@ -184,25 +160,14 @@ def synthesize_speech_from_text(text: str) -> bytes:
     if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted: return result.audio_data
     raise RuntimeError(f"Ошибка синтеза речи: {result.cancellation_details.reason}")
 
-# --- 7. Финальный эндпоинт с новой защитой и лимитами ---
-@app.post("/api/ask-assistant", response_model=AssistantResponse)
-async def ask_assistant(
-    audio_file: UploadFile = File(...), 
-    history_json: str = Form("[]"),
-    validated_user: dict = Depends(get_validated_telegram_data)
-):
-    user_id = validated_user.get('id')
 
-    # ШАГ 1: Проверяем, может ли пользователь использовать ассистента
-    if not check_and_update_assistant_usage:
-         raise HTTPException(status_code=500, detail="Сервис ассистента не сконфигурирован (нет доступа к БД).")
-
-    can_use, message, remaining = check_and_update_assistant_usage(user_id)
-    if not can_use:
-        # Используем статус 429 Too Many Requests, он семантически подходит для лимитов
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=message)
-
-    # ШАГ 2: Если проверка пройдена, выполняем основную логику
+# --- 7. Финальный эндпоинт - теперь без проверок и лимитов ---
+@app.post("/api/ask-assistant", response_model=AssistantResponse, dependencies=[Depends(get_validated_telegram_data)])
+async def ask_assistant(audio_file: UploadFile = File(...), history_json: str = Form("[]")):
+    """
+    Этот эндпоинт теперь полностью бесплатный и безлимитный.
+    Проверяется только аутентификация пользователя через Telegram.
+    """
     try:
         history = json.loads(history_json) if isinstance(history_json, str) else []
         if not isinstance(history, list): history = []
@@ -213,7 +178,7 @@ async def ask_assistant(
         answer_audio_bytes = synthesize_speech_from_text(answer_text)
         audio_base64 = base64.b64encode(answer_audio_bytes).decode('utf-8')
         
-        logging.info(f"Ассистент успешно ответил пользователю {user_id}. Осталось попыток сегодня: {remaining}")
+        logging.info("Ассистент успешно ответил пользователю.")
         return AssistantResponse(userText=recognized_text, assistantText=answer_text, audioBase64=audio_base64)
 
     except ValueError as e:
