@@ -16,8 +16,7 @@ COPY map.requirements.txt .
 RUN pip install --no-cache-dir -r map.requirements.txt
 
 # Копируем код приложения и файл с данными в контейнер
-COPY mapBatyr.py .
-COPY batyrs_data.json .
+COPY . .
 
 # Указываем команду для запуска приложения (ваша команда сохранена)
 # Флаг -u отключает буферизацию вывода, что полезно для просмотра логов в реальном времени
