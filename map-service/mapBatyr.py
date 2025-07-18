@@ -28,9 +28,11 @@ AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 OPENAI_API_VERSION = os.getenv("OPENAI_API_VERSION")
 AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
 SPEECH_VOICE_NAME_KZ = "kk-KZ-DauletNeural"
 SPEECH_VOICE_NAME_RU = "ru-RU-SvetlanaNeural"
 SPEECH_VOICE_NAME_EN = "en-US-JennyNeural"
+
 ASSISTANT_RECOGNITION_LANGUAGE = "kk-KZ"
 ASSISTANT_SYSTEM_PROMPT = "Сен – тарих пәнінің сарапшысы, Батыр атты AI-көмекшісің. Қысқа, құрметпен және мәні бойынша жауап бер. Отвечай 1-2 предложениями. Сенің міндетің – білім беру."
 
@@ -47,7 +49,7 @@ except Exception as e:
 app = Flask(__name__)
 CORS(app, expose_headers=['Content-Language'])
 
-# --- 3. Загрузка данных ТОЛЬКО для Казахстана ---
+# --- 3. Загрузка статических данных для Казахстана ---
 DB_DATA = {}
 LANGUAGES = ['kz', 'ru', 'en']
 
@@ -58,341 +60,22 @@ for lang in LANGUAGES:
             DB_DATA[lang] = json.load(f)
         logging.info(f"✅ Данные для языка '{lang}' из файла '{file_path}' успешно загружены.")
     except FileNotFoundError:
-        logging.warning(f"⚠️ Файл данных '{file_path}' не найден! Данные для этого языка не будут доступны из файла.")
+        logging.warning(f"⚠️ Файл данных '{file_path}' не найден!")
         DB_DATA[lang] = {}
     except Exception as e:
         logging.error(f"❌ ОШИБКА при загрузке данных для языка '{lang}': {e}", exc_info=True)
         DB_DATA[lang] = {}
 
-# --- 4. 🔄 АВТОМАТИЧЕСКИ ЗАПОЛНЕННЫЙ БЛОК: Маппинг ID регионов для GPT ---
+# --- 4. Маппинг ID регионов для GPT ---
 REGION_ID_TO_NAME_MAP = {
-    'ru': {
-        'RUBEL': 'Белгородская область',
-        'RUBRY': 'Брянская область',
-        'RUVLA': 'Владимирская область',
-        'RUVOR': 'Воронежская область',
-        'RUIVA': 'Ивановская область',
-        'RUKLU': 'Калужская область',
-        'RUKOS': 'Костромская область',
-        'RUKRS': 'Курская область',
-        'RULIP': 'Липецкая область',
-        'RUMOW': 'Москва',
-        'RUMOS': 'Московская область',
-        'RUORL': 'Орловская область',
-        'RURYA': 'Рязанская область',
-        'RUSMO': 'Смоленская область',
-        'RUTAM': 'Тамбовская область',
-        'RUTVE': 'Тверская область',
-        'RUTUL': 'Тульская область',
-        'RUYAR': 'Ярославская область',
-        'RUARK': 'Архангельская область',
-        'RUVLG': 'Вологодская область',
-        'RUKGD': 'Калининградская область',
-        'RUKR': 'Республика Карелия',
-        'RUKO': 'Республика Коми',
-        'RULEN': 'Ленинградская область',
-        'RUMUR': 'Мурманская область',
-        'RUNEN': 'Ненецкий АО',
-        'RUNGR': 'Новгородская область',
-        'RUPSK': 'Псковская область',
-        'RUSPE': 'Санкт-Петербург',
-        'RUAD': 'Республика Адыгея',
-        'RUAST': 'Астраханская область',
-        'RUVGG': 'Волгоградская область',
-        'RUKL': 'Республика Калмыкия',
-        'RUKDA': 'Краснодарский край',
-        'RUROS': 'Ростовская область',
-        'RUDA': 'Республика Дагестан',
-        'RUIN': 'Республика Ингушетия',
-        'RUKB': 'Кабардино-Балкарская Республика',
-        'RUKC': 'Карачаево-Черкесская Республика',
-        'RUSE': 'Республика Северная Осетия — Алания',
-        'RUSTA': 'Ставропольский край',
-        'RUCE': 'Чеченская Республика',
-        'RUBA': 'Республика Башкортостан',
-        'RUKIR': 'Кировская область',
-        'RUME': 'Республика Марий Эл',
-        'RUMO': 'Республика Мордовия',
-        'RUNIZ': 'Нижегородская область',
-        'RUORE': 'Оренбургская область',
-        'RUPNZ': 'Пензенская область',
-        'RUPER': 'Пермский край',
-        'RUSAM': 'Самарская область',
-        'RUSAR': 'Саратовская область',
-        'RUTA': 'Республика Татарстан',
-        'RUUD': 'Удмуртская Республика',
-        'RUULY': 'Ульяновская область',
-        'RUCU': 'Чувашская Республика',
-        'RUKGN': 'Курганская область',
-        'RUSVE': 'Свердловская область',
-        'RUTYU': 'Тюменская область',
-        'RUKHM': 'Ханты-Мансийский АО — Югра',
-        'RUCHE': 'Челябинская область',
-        'RUYAN': 'Ямало-Ненецкий АО',
-        'RUAL': 'Республика Алтай',
-        'RUALT': 'Алтайский край',
-        'RUIRK': 'Иркутская область',
-        'RUKEM': 'Кемеровская область',
-        'RUKYA': 'Красноярский край',
-        'RUNVS': 'Новосибирская область',
-        'RUOMS': 'Омская область',
-        'RUTOM': 'Томская область',
-        'RUTY': 'Республика Тыва',
-        'RUKK': 'Республика Хакасия',
-        'RUAMU': 'Амурская область',
-        'RUBU': 'Республика Бурятия',
-        'RUYEV': 'Еврейская АО',
-        'RUZAB': 'Забайкальский край',
-        'RUKAM': 'Камчатский край',
-        'RUMAG': 'Магаданская область',
-        'RUPRI': 'Приморский край',
-        'RUSA': 'Республика Саха (Якутия)',
-        'RUSAK': 'Сахалинская область',
-        'RUKHA': 'Хабаровский край',
-        'RUCHU': 'Чукотский АО'
-    },
-    'en': {
-        'GBABD': 'Aberdeenshire',
-        'GBABE': 'Aberdeen',
-        'GBAGB': 'Argyll and Bute',
-        'GBANS': 'Angus',
-        'GBCLK': 'Clackmannanshire',
-        'GBDGY': 'Dumfries and Galloway',
-        'GBDND': 'Dundee',
-        'GBEAY': 'East Ayrshire',
-        'GBEDH': 'Edinburgh',
-        'GBEDU': 'East Dunbartonshire',
-        'GBELN': 'East Lothian',
-        'GBELS': 'Eilean Siar',
-        'GBERW': 'East Renfrewshire',
-        'GBFAL': 'Falkirk',
-        'GBFIF': 'Fife',
-        'GBGLG': 'Glasgow',
-        'GBHLD': 'Highland',
-        'GBIVC': 'Inverclyde',
-        'GBMLN': 'Midlothian',
-        'GBMRY': 'Moray',
-        'GBNAY': 'North Ayrshire',
-        'GBNLK': 'North Lanarkshire',
-        'GBORK': 'Orkney',
-        'GBPKN': 'Perthshire and Kinross',
-        'GBRFW': 'Renfrewshire',
-        'GBSAY': 'South Ayrshire',
-        'GBSCB': 'Scottish Borders',
-        'GBSLK': 'South Lanarkshire',
-        'GBSTG': 'Stirling',
-        'GBWDU': 'West Dunbartonshire',
-        'GBWLN': 'West Lothian',
-        'GBZET': 'Shetland Islands',
-        'GBAGY': 'Anglesey',
-        'GBBGE': 'Bridgend',
-        'GBBGW': 'Blaenau Gwent',
-        'GBCAY': 'Caerphilly',
-        'GBCGN': 'Ceredigion',
-        'GBCMN': 'Carmarthenshire',
-        'GBCRF': 'Cardiff',
-        'GBCWY': 'Conwy',
-        'GBDEN': 'Denbighshire',
-        'GBFLN': 'Flintshire',
-        'GBGWN': 'Gwynedd',
-        'GBMON': 'Monmouthshire',
-        'GBMTY': 'Merthyr Tydfil',
-        'GBNTL': 'Neath Port Talbot',
-        'GBNWP': 'Newport',
-        'GBPEM': 'Pembrokeshire',
-        'GBPOW': 'Powys',
-        'GBRCT': 'Rhondda Cynon Taff',
-        'GBSWA': 'Swansea',
-        'GBTOF': 'Torfaen',
-        'GBVGL': 'Vale of Glamorgan',
-        'GBWRX': 'Wrexham',
-        'GBANT': 'Antrim',
-        'GBARD': 'Ards',
-        'GBARM': 'Armagh',
-        'GBBFS': 'Belfast',
-        'GBBLA': 'Ballymena',
-        'GBBLY': 'Ballymoney',
-        'GBBNB': 'Banbridge',
-        'GBCKF': 'Carrickfergus',
-        'GBCGV': 'Craigavon',
-        'GBCKT': 'Mid Ulster',
-        'GBCLR': 'Coleraine',
-        'GBCSR': 'Castlereagh',
-        'GBDGN': 'Dungannon',
-        'GBDOW': 'Down',
-        'GBDRY': 'Derry',
-        'GBFER': 'Fermanagh',
-        'GBLMV': 'Limavady',
-        'GBLRN': 'Larne',
-        'GBLSB': 'Lisburn',
-        'GBMFT': 'Magherafelt',
-        'GBMYL': 'Moyle',
-        'GBNDN': 'North Down',
-        'GBNTA': 'Newtownabbey',
-        'GBNYM': 'Newry and Mourne',
-        'GBOMH': 'Omagh',
-        'GBSTB': 'Strabane',
-        'GBBDF': 'Bedford',
-        'GBBKM': 'Buckinghamshire',
-        'GBBRC': 'Bracknell Forest',
-        'GBCBF': 'Central Bedfordshire',
-        'GBESS': 'Essex',
-        'GBESX': 'East Sussex',
-        'GBHAM': 'Hampshire',
-        'GBHRT': 'Hertfordshire',
-        'GBIOW': 'Isle of Wight',
-        'GBKEN': 'Kent',
-        'GBLUT': 'Luton',
-        'GBMDW': 'Medway',
-        'GBMIK': 'Milton Keynes',
-        'GBOXF': 'Oxfordshire',
-        'GBPOR': 'Portsmouth',
-        'GBRDG': 'Reading',
-        'GBSLG': 'Slough',
-        'GBSOS': 'Southend-on-Sea',
-        'GBSTH': 'Southampton',
-        'GBSRY': 'Surrey',
-        'GBTHR': 'Thurrock',
-        'GBWBK': 'West Berkshire',
-        'GBWNM': 'Windsor and Maidenhead',
-        'GBWOK': 'Wokingham',
-        'GBWSX': 'West Sussex',
-        'GBBDG': 'Barking and Dagenham',
-        'GBBNE': 'Barnet',
-        'GBBEX': 'Bexley',
-        'GBBEN': 'Brent',
-        'GBBRY': 'Bromley',
-        'GBCMD': 'Camden',
-        'GBCRY': 'Croydon',
-        'GBEAL': 'Ealing',
-        'GBENF': 'Enfield',
-        'GBGRE': 'Greenwich',
-        'GBHCK': 'Hackney',
-        'GBHMF': 'Hammersmith and Fulham',
-        'GBHRY': 'Haringey',
-        'GBHRW': 'Harrow',
-        'GBHAV': 'Havering',
-        'GBHIL': 'Hillingdon',
-        'GBHNS': 'Hounslow',
-        'GBISL': 'Islington',
-        'GBKEC': 'Kensington and Chelsea',
-        'GBKTT': 'Kingston upon Thames',
-        'GBLBH': 'Lambeth',
-        'GBLEW': 'Lewisham',
-        'GBLND': 'City of London',
-        'GBMRT': 'Merton',
-        'GBNWM': 'Newham',
-        'GBRDB': 'Redbridge',
-        'GBRIC': 'Richmond upon Thames',
-        'GBSWK': 'Southwark',
-        'GBSTN': 'Sutton',
-        'GBTWH': 'Tower Hamlets',
-        'GBWFT': 'Waltham Forest',
-        'GBWND': 'Wandsworth',
-        'GBWSM': 'Westminster',
-        'GBBAS': 'Bath and North East Somerset',
-        'GBBNH': 'Brighton and Hove',
-        'GBBMH': 'Bournemouth',
-        'GBBST': 'Bristol',
-        'GBCON': 'Cornwall',
-        'GBDEV': 'Devon',
-        'GBDOR': 'Dorset',
-        'GBGLS': 'Gloucestershire',
-        'GBIOS': 'Isles of Scilly',
-        'GBNSM': 'North Somerset',
-        'GBPLY': 'Plymouth',
-        'GBPOL': 'Poole',
-        'GBSGC': 'South Gloucestershire',
-        'GBSOM': 'Somerset',
-        'GBSWD': 'Swindon',
-        'GBTOB': 'Torbay',
-        'GBWIL': 'Wiltshire',
-        'GBBIR': 'Birmingham',
-        'GBCOV': 'Coventry',
-        'GBDBY': 'Derbyshire',
-        'GBDER': 'Derby',
-        'GBDUD': 'Dudley',
-        'GBHEF': 'Herefordshire',
-        'GBLCE': 'Leicester',
-        'GBLEC': 'Leicestershire',
-        'GBLIN': 'Lincolnshire',
-        'GBNTH': 'Northamptonshire',
-        'GBNTT': 'Nottinghamshire',
-        'GBNGM': 'Nottingham',
-        'GBRUT': 'Rutland',
-        'GBSAW': 'Sandwell',
-        'GBSHR': 'Shropshire',
-        'GBSOL': 'Solihull',
-        'GBSTE': 'Stoke-on-Trent',
-        'GBSTS': 'Staffordshire',
-        'GBTFW': 'Telford and Wrekin',
-        'GBWLL': 'Walsall',
-        'GBWAR': 'Warwickshire',
-        'GBWLV': 'Wolverhampton',
-        'GBWOR': 'Worcestershire',
-        'GBBBD': 'Blackburn with Darwen',
-        'GBBNS': 'Barnsley',
-        'GBBOL': 'Bolton',
-        'GBBPL': 'Blackpool',
-        'GBBRD': 'Bradford',
-        'GBBUR': 'Bury',
-        'GBCHE': 'Cheshire East',
-        'GBCHW': 'Cheshire West and Chester',
-        'GBCLD': 'Calderdale',
-        'GBCMA': 'Cumbria',
-        'GBDAL': 'Darlington',
-        'GBDNC': 'Doncaster',
-        'GBDUR': 'Durham',
-        'GBGAT': 'Gateshead',
-        'GBHAL': 'Halton',
-        'GBHPL': 'Hartlepool',
-        'GBKHL': 'Kingston upon Hull',
-        'GBKIR': 'Kirklees',
-        'GBKWL': 'Knowsley',
-        'GBLAN': 'Lancashire',
-        'GBLDS': 'Leeds',
-        'GBLIV': 'Liverpool',
-        'GBMAN': 'Manchester',
-        'GBMDB': 'Middlesbrough',
-        'GBNET': 'Newcastle upon Tyne',
-        'GBNBL': 'Northumberland',
-        'GBNEL': 'North East Lincolnshire',
-        'GBNLN': 'North Lincolnshire',
-        'GBNTY': 'North Tyneside',
-        'GBNYK': 'North Yorkshire',
-        'GBOLD': 'Oldham',
-        'GBRCC': 'Redcar and Cleveland',
-        'GBRCH': 'Rochdale',
-        'GBROT': 'Rotherham',
-        'GBSLF': 'Salford',
-        'GBSFT': 'Sefton',
-        'GBSHF': 'Sheffield',
-        'GBSHN': 'Merseyside',
-        'GBSKP': 'Stockport',
-        'GBSND': 'Sunderland',
-        'GBSTT': 'Stockton-on-Tees',
-        'GBSTY': 'South Tyneside',
-        'GBTAM': 'Tameside',
-        'GBTRF': 'Trafford',
-        'GBWGN': 'Wigan',
-        'GBWKF': 'Wakefield',
-        'GBWRT': 'Warrington',
-        'GBYOR': 'York',
-        'GBCAM': 'Cambridgeshire',
-        'GBERY': 'East Riding of Yorkshire',
-        'GBNFK': 'Norfolk',
-        'GBPTE': 'Peterborough',
-        'GBSFK': 'Suffolk'
-    }
+    'ru': { 'RUBEL': 'Белгородская область', 'RUBRY': 'Брянская область', 'RUVLA': 'Владимирская область', 'RUVOR': 'Воронежская область', 'RUIVA': 'Ивановская область', 'RUKLU': 'Калужская область', 'RUKOS': 'Костромская область', 'RUKRS': 'Курская область', 'RULIP': 'Липецкая область', 'RUMOW': 'Москва', 'RUMOS': 'Московская область', 'RUORL': 'Орловская область', 'RURYA': 'Рязанская область', 'RUSMO': 'Смоленская область', 'RUTAM': 'Тамбовская область', 'RUTVE': 'Тверская область', 'RUTUL': 'Тульская область', 'RUYAR': 'Ярославская область', 'RUARK': 'Архангельская область', 'RUVLG': 'Вологодская область', 'RUKGD': 'Калининградская область', 'RUKR': 'Республика Карелия', 'RUKO': 'Республика Коми', 'RULEN': 'Ленинградская область', 'RUMUR': 'Мурманская область', 'RUNEN': 'Ненецкий АО', 'RUNGR': 'Новгородская область', 'RUPSK': 'Псковская область', 'RUSPE': 'Санкт-Петербург', 'RUAD': 'Республика Адыгея', 'RUAST': 'Астраханская область', 'RUVGG': 'Волгоградская область', 'RUKL': 'Республика Калмыкия', 'RUKDA': 'Краснодарский край', 'RUROS': 'Ростовская область', 'RUDA': 'Республика Дагестан', 'RUIN': 'Республика Ингушетия', 'RUKB': 'Кабардино-Балкарская Республика', 'RUKC': 'Карачаево-Черкесская Республика', 'RUSE': 'Республика Северная Осетия — Алания', 'RUSTA': 'Ставропольский край', 'RUCE': 'Чеченская Республика', 'RUBA': 'Республика Башкортостан', 'RUKIR': 'Кировская область', 'RUME': 'Республика Марий Эл', 'RUMO': 'Республика Мордовия', 'RUNIZ': 'Нижегородская область', 'RUORE': 'Оренбургская область', 'RUPNZ': 'Пензенская область', 'RUPER': 'Пермский край', 'RUSAM': 'Самарская область', 'RUSAR': 'Саратовская область', 'RUTA': 'Республика Татарстан', 'RUUD': 'Удмуртская Республика', 'RUULY': 'Ульяновская область', 'RUCU': 'Чувашская Республика', 'RUKGN': 'Курганская область', 'RUSVE': 'Свердловская область', 'RUTYU': 'Тюменская область', 'RUKHM': 'Ханты-Мансийский АО — Югра', 'RUCHE': 'Челябинская область', 'RUYAN': 'Ямало-Ненецкий АО', 'RUAL': 'Республика Алтай', 'RUALT': 'Алтайский край', 'RUIRK': 'Иркутская область', 'RUKEM': 'Кемеровская область', 'RUKYA': 'Красноярский край', 'RUNVS': 'Новосибирская область', 'RUOMS': 'Омская область', 'RUTOM': 'Томская область', 'RUTY': 'Республика Тыва', 'RUKK': 'Республика Хакасия', 'RUAMU': 'Амурская область', 'RUBU': 'Республика Бурятия', 'RUYEV': 'Еврейская АО', 'RUZAB': 'Забайкальский край', 'RUKAM': 'Камчатский край', 'RUMAG': 'Магаданская область', 'RUPRI': 'Приморский край', 'RUSA': 'Республика Саха (Якутия)', 'RUSAK': 'Сахалинская область', 'RUKHA': 'Хабаровский край', 'RUCHU': 'Чукотский АО' },
+    'en': { 'GBABD': 'Aberdeenshire', 'GBABE': 'Aberdeen', 'GBAGB': 'Argyll and Bute', 'GBANS': 'Angus', 'GBCLK': 'Clackmannanshire', 'GBDGY': 'Dumfries and Galloway', 'GBDND': 'Dundee', 'GBEAY': 'East Ayrshire', 'GBEDH': 'Edinburgh', 'GBEDU': 'East Dunbartonshire', 'GBELN': 'East Lothian', 'GBELS': 'Eilean Siar', 'GBERW': 'East Renfrewshire', 'GBFAL': 'Falkirk', 'GBFIF': 'Fife', 'GBGLG': 'Glasgow', 'GBHLD': 'Highland', 'GBIVC': 'Inverclyde', 'GBMLN': 'Midlothian', 'GBMRY': 'Moray', 'GBNAY': 'North Ayrshire', 'GBNLK': 'North Lanarkshire', 'GBORK': 'Orkney', 'GBPKN': 'Perthshire and Kinross', 'GBRFW': 'Renfrewshire', 'GBSAY': 'South Ayrshire', 'GBSCB': 'Scottish Borders', 'GBSLK': 'South Lanarkshire', 'GBSTG': 'Stirling', 'GBWDU': 'West Dunbartonshire', 'GBWLN': 'West Lothian', 'GBZET': 'Shetland Islands', 'GBAGY': 'Anglesey', 'GBBGE': 'Bridgend', 'GBBGW': 'Blaenau Gwent', 'GBCAY': 'Caerphilly', 'GBCGN': 'Ceredigion', 'GBCMN': 'Carmarthenshire', 'GBCRF': 'Cardiff', 'GBCWY': 'Conwy', 'GBDEN': 'Denbighshire', 'GBFLN': 'Flintshire', 'GBGWN': 'Gwynedd', 'GBMON': 'Monmouthshire', 'GBMTY': 'Merthyr Tydfil', 'GBNTL': 'Neath Port Talbot', 'GBNWP': 'Newport', 'GBPEM': 'Pembrokeshire', 'GBPOW': 'Powys', 'GBRCT': 'Rhondda Cynon Taff', 'GBSWA': 'Swansea', 'GBTOF': 'Torfaen', 'GBVGL': 'Vale of Glamorgan', 'GBWRX': 'Wrexham', 'GBANT': 'Antrim', 'GBARD': 'Ards', 'GBARM': 'Armagh', 'GBBFS': 'Belfast', 'GBBLA': 'Ballymena', 'GBBLY': 'Ballymoney', 'GBBNB': 'Banbridge', 'GBCKF': 'Carrickfergus', 'GBCGV': 'Craigavon', 'GBCKT': 'Mid Ulster', 'GBCLR': 'Coleraine', 'GBCSR': 'Castlereagh', 'GBDGN': 'Dungannon', 'GBDOW': 'Down', 'GBDRY': 'Derry', 'GBFER': 'Fermanagh', 'GBLMV': 'Limavady', 'GBLRN': 'Larne', 'GBLSB': 'Lisburn', 'GBMFT': 'Magherafelt', 'GBMYL': 'Moyle', 'GBNDN': 'North Down', 'GBNTA': 'Newtownabbey', 'GBNYM': 'Newry and Mourne', 'GBOMH': 'Omagh', 'GBSTB': 'Strabane', 'GBBDF': 'Bedford', 'GBBKM': 'Buckinghamshire', 'GBBRC': 'Bracknell Forest', 'GBCBF': 'Central Bedfordshire', 'GBESS': 'Essex', 'GBESX': 'East Sussex', 'GBHAM': 'Hampshire', 'GBHRT': 'Hertfordshire', 'GBIOW': 'Isle of Wight', 'GBKEN': 'Kent', 'GBLUT': 'Luton', 'GBMDW': 'Medway', 'GBMIK': 'Milton Keynes', 'GBOXF': 'Oxfordshire', 'GBPOR': 'Portsmouth', 'GBRDG': 'Reading', 'GBSLG': 'Slough', 'GBSOS': 'Southend-on-Sea', 'GBSTH': 'Southampton', 'GBSRY': 'Surrey', 'GBTHR': 'Thurrock', 'GBWBK': 'West Berkshire', 'GBWNM': 'Windsor and Maidenhead', 'GBWOK': 'Wokingham', 'GBWSX': 'West Sussex', 'GBBDG': 'Barking and Dagenham', 'GBBNE': 'Barnet', 'GBBEX': 'Bexley', 'GBBEN': 'Brent', 'GBBRY': 'Bromley', 'GBCMD': 'Camden', 'GBCRY': 'Croydon', 'GBEAL': 'Ealing', 'GBENF': 'Enfield', 'GBGRE': 'Greenwich', 'GBHCK': 'Hackney', 'GBHMF': 'Hammersmith and Fulham', 'GBHRY': 'Haringey', 'GBHRW': 'Harrow', 'GBHAV': 'Havering', 'GBHIL': 'Hillingdon', 'GBHNS': 'Hounslow', 'GBISL': 'Islington', 'GBKEC': 'Kensington and Chelsea', 'GBKTT': 'Kingston upon Thames', 'GBLBH': 'Lambeth', 'GBLEW': 'Lewisham', 'GBLND': 'City of London', 'GBMRT': 'Merton', 'GBNWM': 'Newham', 'GBRDB': 'Redbridge', 'GBRIC': 'Richmond upon Thames', 'GBSWK': 'Southwark', 'GBSTN': 'Sutton', 'GBTWH': 'Tower Hamlets', 'GBWFT': 'Waltham Forest', 'GBWND': 'Wandsworth', 'GBWSM': 'Westminster', 'GBBAS': 'Bath and North East Somerset', 'GBBNH': 'Brighton and Hove', 'GBBMH': 'Bournemouth', 'GBBST': 'Bristol', 'GBCON': 'Cornwall', 'GBDEV': 'Devon', 'GBDOR': 'Dorset', 'GBGLS': 'Gloucestershire', 'GBIOS': 'Isles of Scilly', 'GBNSM': 'North Somerset', 'GBPLY': 'Plymouth', 'GBPOL': 'Poole', 'GBSGC': 'South Gloucestershire', 'GBSOM': 'Somerset', 'GBSWD': 'Swindon', 'GBTOB': 'Torbay', 'GBWIL': 'Wiltshire', 'GBBIR': 'Birmingham', 'GBCOV': 'Coventry', 'GBDBY': 'Derbyshire', 'GBDER': 'Derby', 'GBDUD': 'Dudley', 'GBHEF': 'Herefordshire', 'GBLCE': 'Leicester', 'GBLEC': 'Leicestershire', 'GBLIN': 'Lincolnshire', 'GBNTH': 'Northamptonshire', 'GBNTT': 'Nottinghamshire', 'GBNGM': 'Nottingham', 'GBRUT': 'Rutland', 'GBSAW': 'Sandwell', 'GBSHR': 'Shropshire', 'GBSOL': 'Solihull', 'GBSTE': 'Stoke-on-Trent', 'GBSTS': 'Staffordshire', 'GBTFW': 'Telford and Wrekin', 'GBWLL': 'Walsall', 'GBWAR': 'Warwickshire', 'GBWLV': 'Wolverhampton', 'GBWOR': 'Worcestershire', 'GBBBD': 'Blackburn with Darwen', 'GBBNS': 'Barnsley', 'GBBOL': 'Bolton', 'GBBPL': 'Blackpool', 'GBBRD': 'Bradford', 'GBBUR': 'Bury', 'GBCHE': 'Cheshire East', 'GBCHW': 'Cheshire West and Chester', 'GBCLD': 'Calderdale', 'GBCMA': 'Cumbria', 'GBDAL': 'Darlington', 'GBDNC': 'Doncaster', 'GBDUR': 'Durham', 'GBGAT': 'Gateshead', 'GBHAL': 'Halton', 'GBHPL': 'Hartlepool', 'GBKHL': 'Kingston upon Hull', 'GBKIR': 'Kirklees', 'GBKWL': 'Knowsley', 'GBLAN': 'Lancashire', 'GBLDS': 'Leeds', 'GBLIV': 'Liverpool', 'GBMAN': 'Manchester', 'GBMDB': 'Middlesbrough', 'GBNET': 'Newcastle upon Tyne', 'GBNBL': 'Northumberland', 'GBNEL': 'North East Lincolnshire', 'GBNLN': 'North Lincolnshire', 'GBNTY': 'North Tyneside', 'GBNYK': 'North Yorkshire', 'GBOLD': 'Oldham', 'GBRCC': 'Redcar and Cleveland', 'GBRCH': 'Rochdale', 'GBROT': 'Rotherham', 'GBSLF': 'Salford', 'GBSFT': 'Sefton', 'GBSHF': 'Sheffield', 'GBSHN': 'Merseyside', 'GBSKP': 'Stockport', 'GBSND': 'Sunderland', 'GBSTT': 'Stockton-on-Tees', 'GBSTY': 'South Tyneside', 'GBTAM': 'Tameside', 'GBTRF': 'Trafford', 'GBWGN': 'Wigan', 'GBWKF': 'Wakefield', 'GBWRT': 'Warrington', 'GBYOR': 'York', 'GBCAM': 'Cambridgeshire', 'GBERY': 'East Riding of Yorkshire', 'GBNFK': 'Norfolk', 'GBPTE': 'Peterborough', 'GBSFK': 'Suffolk' }
 }
 
-# --- 5. 🔄 НОВАЯ ФУНКЦИЯ: Генерация данных с помощью GPT ---
+# --- 5. Функция-генератор GPT ---
 def generate_region_data_with_gpt(region_name, country_name, hero_type_plural, lang):
-    """
-    Генерирует данные о регионе с помощью Azure OpenAI, возвращая их в нужном JSON формате.
-    """
-    lang_map = {'ru': 'русском', 'en': 'английском'}
-    language_name = lang_map.get(lang, 'казахском')
+    lang_map = {'ru': 'русском', 'en': 'английском', 'kz': 'казахском'}
+    language_name = lang_map.get(lang, 'английском')
 
     prompt = f"""
 Ты — историк-эксперт. Твоя задача — сгенерировать краткую историческую справку о регионе.
@@ -441,14 +124,11 @@ def generate_region_data_with_gpt(region_name, country_name, hero_type_plural, l
         if "heroes" in parsed_json and "batyrs" not in parsed_json:
             parsed_json["batyrs"] = parsed_json.pop("heroes")
         return parsed_json
-    except json.JSONDecodeError as e:
-        logging.error(f"❌ [GPT] Ошибка декодирования JSON от LLM: {e}\nОтвет был: {content}")
-        return None
     except Exception as e:
-        logging.error(f"❌ [GPT] Ошибка при обращении к OpenAI для генерации данных: {e}", exc_info=True)
+        logging.error(f"❌ [GPT] Ошибка при генерации данных: {e}", exc_info=True)
         return None
 
-# --- 6. 🔄 ОБНОВЛЕННЫЙ ЭНДПОИНТ: Гибридная логика для карты ---
+# --- 6. ОБНОВЛЕННЫЙ ЭНДПОИНТ: Гибридная логика с полной поддержкой языков ---
 @app.route('/api/region/<string:region_id>', methods=['GET'])
 def get_region_info(region_id):
     theme = request.args.get('theme', 'kz').lower()
@@ -456,40 +136,54 @@ def get_region_info(region_id):
     if lang not in LANGUAGES:
         lang = 'kz'
 
-    logging.info(f"🐌 Запрос на данные. Регион: {region_id}, Тема карты: {theme}, Язык: {lang}")
+    logging.info(f"🐌 Запрос на данные. Регион: {region_id}, Тема: {theme}, Язык интерфейса: {lang}")
 
     # --- Ветвь 1: Карта Казахстана (из файла) ---
     if theme == 'kz':
         lang_data = DB_DATA.get(lang)
-        if not lang_data:
-            abort(500, description=f"Данные для языка '{lang}' не загружены на сервере.")
-        region_data = lang_data.get(region_id.upper())
+        region_data = lang_data.get(region_id.upper()) if lang_data else None
+        
+        # Если для текущего языка нет данных, пробуем найти на языке по умолчанию (kz)
         if not region_data:
-            abort(404, description=f"Регион с ID '{region_id}' на языке '{lang}' не найден.")
+            logging.warning(f"Не найдены данные для {region_id} на языке '{lang}'. Попытка найти на 'kz'.")
+            lang_data_fallback = DB_DATA.get('kz', {})
+            region_data = lang_data_fallback.get(region_id.upper())
+            response_lang = 'kz'
+        else:
+            response_lang = lang
+
+        if not region_data:
+            abort(404, description=f"Регион '{region_id}' не найден ни на одном языке в файлах.")
+
         response = jsonify(region_data)
-        response.headers['Content-Language'] = lang
+        response.headers['Content-Language'] = response_lang
         return response
 
     # --- Ветвь 2: Карты России и Англии (через GPT) ---
     elif theme in ['ru', 'en']:
-        if theme == 'ru':
-            country_name, hero_type_plural, gpt_lang = "Россия", "богатыри и герои", 'ru'
-        else: # theme == 'en'
-            country_name, hero_type_plural, gpt_lang = "Великобритания", "knights and heroes", 'en'
-
         region_name = REGION_ID_TO_NAME_MAP.get(theme, {}).get(region_id.upper())
         if not region_name:
-             abort(404, description=f"Не найдено сопоставление для ID региона '{region_id}' в теме '{theme}'. Проверьте словарь REGION_ID_TO_NAME_MAP на сервере.")
+             abort(404, description=f"ID региона '{region_id}' не найден в словаре для темы '{theme}'.")
 
-        generated_data = generate_region_data_with_gpt(region_name, country_name, hero_type_plural, gpt_lang)
+        # Определяем язык для генерации контента
+        gpt_lang = lang if lang in ['ru', 'en'] else ('ru' if theme == 'ru' else 'en')
+
+        # Определяем параметры для промпта в зависимости от языка генерации
+        if gpt_lang == 'ru':
+            country_name = "Россия" if theme == 'ru' else "Великобритания"
+            hero_type = "богатыри и герои" if theme == 'ru' else "рыцари и герои"
+        else: # gpt_lang == 'en'
+            country_name = "Russia" if theme == 'ru' else "Great Britain"
+            hero_type = "heroes and warriors" if theme == 'ru' else "knights and heroes"
+
+        generated_data = generate_region_data_with_gpt(region_name, country_name, hero_type, gpt_lang)
         if not generated_data:
-            abort(503, description=f"Не удалось сгенерировать данные для региона '{region_name}'. Сервис AI временно недоступен или вернул неверный формат.")
+            abort(503, description=f"Не удалось сгенерировать данные для '{region_name}'.")
 
         response = jsonify(generated_data)
         response.headers['Content-Language'] = gpt_lang
         return response
-
-    # --- Ветвь 3: Неизвестная тема ---
+    
     else:
         abort(400, description=f"Неподдерживаемая тема карты: '{theme}'.")
 
@@ -497,7 +191,6 @@ def get_region_info(region_id):
 @app.route('/api/tts', methods=['POST'])
 def text_to_speech_azure():
     if not all([SPEECH_KEY, SPEECH_REGION]):
-        logging.error("❌ [TTS] Ключи или регион не найдены.")
         return jsonify({"error": "Azure TTS service is not configured."}), 500
     
     data = request.get_json()
@@ -507,12 +200,11 @@ def text_to_speech_azure():
     if not text_to_speak:
         return jsonify({"error": "No text provided."}), 400
 
-    # Выбираем голос в зависимости от языка
     if lang_for_tts == 'ru':
         voice_name = SPEECH_VOICE_NAME_RU
     elif lang_for_tts == 'en':
         voice_name = SPEECH_VOICE_NAME_EN
-    else: # 'kz' по умолчанию
+    else:
         voice_name = SPEECH_VOICE_NAME_KZ
 
     logging.info(f"🔊 [TTS] Запрос на озвучку (язык: {lang_for_tts}, голос: {voice_name}): {text_to_speak[:50]}...")
@@ -524,7 +216,6 @@ def text_to_speech_azure():
         result = synthesizer.speak_text_async(text_to_speak).get()
 
         if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
-            logging.info("✅ [TTS] Аудио успешно сгенерировано.")
             return Response(result.audio_data, mimetype='audio/mp3')
         else:
             logging.error(f"❌ [TTS] Ошибка синтеза: {result.cancellation_details}")
