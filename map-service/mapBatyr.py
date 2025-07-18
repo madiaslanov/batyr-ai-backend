@@ -128,7 +128,7 @@ def generate_region_data_with_gpt(region_name, country_name, hero_type_plural, l
         logging.error(f"❌ [GPT] Ошибка при генерации данных: {e}", exc_info=True)
         return None
 
-# --- 6. ОБНОВЛЕННЫЙ ЭНДПОИНТ: Гибридная логика с полной поддержкой языков ---
+# --- 6. ИСПРАВЛЕННЫЙ ЭНДПОИНТ: Гибридная логика с полной поддержкой языков ---
 @app.route('/api/region/<string:region_id>', methods=['GET'])
 def get_region_info(region_id):
     theme = request.args.get('theme', 'kz').lower()
@@ -143,7 +143,6 @@ def get_region_info(region_id):
         lang_data = DB_DATA.get(lang)
         region_data = lang_data.get(region_id.upper()) if lang_data else None
         
-        # Если для текущего языка нет данных, пробуем найти на языке по умолчанию (kz)
         if not region_data:
             logging.warning(f"Не найдены данные для {region_id} на языке '{lang}'. Попытка найти на 'kz'.")
             lang_data_fallback = DB_DATA.get('kz', {})
@@ -165,13 +164,16 @@ def get_region_info(region_id):
         if not region_name:
              abort(404, description=f"ID региона '{region_id}' не найден в словаре для темы '{theme}'.")
 
-        # Определяем язык для генерации контента
-        gpt_lang = lang if lang in ['ru', 'en'] else ('ru' if theme == 'ru' else 'en')
+        # 🔄 ИЗМЕНЕНИЕ: Язык для GPT теперь всегда равен языку интерфейса.
+        gpt_lang = lang
 
-        # Определяем параметры для промпта в зависимости от языка генерации
+        # 🔄 ИЗМЕНЕНИЕ: Добавлена логика для казахского языка в параметрах промпта.
         if gpt_lang == 'ru':
             country_name = "Россия" if theme == 'ru' else "Великобритания"
             hero_type = "богатыри и герои" if theme == 'ru' else "рыцари и герои"
+        elif gpt_lang == 'kz':
+            country_name = "Ресей" if theme == 'ru' else "Ұлыбритания"
+            hero_type = "батырлар мен қаһармандар" if theme == 'ru' else "рыцарьлар мен батырлар"
         else: # gpt_lang == 'en'
             country_name = "Russia" if theme == 'ru' else "Great Britain"
             hero_type = "heroes and warriors" if theme == 'ru' else "knights and heroes"
@@ -226,6 +228,7 @@ def text_to_speech_azure():
 
 
 # --- 8. Функции и эндпоинт для Голосового ассистента ---
+# ... (Этот блок остается без изменений)
 def recognize_speech_from_bytes(audio_bytes: bytes) -> str:
     audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
     audio_segment = audio_segment.set_channels(1).set_frame_rate(16000)
